@@ -1,0 +1,5 @@
+import { ProjectDocumentUpload } from '@/components/projects/ProjectDocumentUpload';
+import { ProjectDocumentsList } from '@/components/projects/ProjectDocumentsList';
+import { getProjectDocumentation } from '@/src/modules/projects/server/queries';
+
+export default async function FilesPage({ params }: { params: Promise<{ projectId: string }> }) { const { projectId } = await params; const data = await getProjectDocumentation(projectId); const documents = data.documents.filter((doc) => doc.type !== 'SIGNED_CONTRACT'); return <section aria-labelledby="files-title" className="space-y-4"><div className="flex flex-wrap items-end justify-between gap-3"><div><h2 id="files-title" className="text-base font-bold text-slate-900">Archivos</h2><p className="mt-1 text-sm text-slate-500">Propuestas, comprobantes, facturas, entregables y archivos internos.</p></div><ProjectDocumentUpload projectId={projectId} clientId={data.clientId} /></div><ProjectDocumentsList documents={documents} empty="Todavía no hay archivos vinculados al proyecto." /></section>; }

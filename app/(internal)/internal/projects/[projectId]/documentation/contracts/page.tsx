@@ -1,0 +1,5 @@
+import { ProjectDocumentUpload } from '@/components/projects/ProjectDocumentUpload';
+import { ProjectDocumentsList } from '@/components/projects/ProjectDocumentsList';
+import { getProjectDocumentation } from '@/src/modules/projects/server/queries';
+
+export default async function ContractsPage({ params }: { params: Promise<{ projectId: string }> }) { const { projectId } = await params; const data = await getProjectDocumentation(projectId); const documents = data.documents.filter((doc) => doc.type === 'SIGNED_CONTRACT'); return <section aria-labelledby="contracts-title" className="space-y-4"><div className="flex flex-wrap items-end justify-between gap-3"><div><h2 id="contracts-title" className="text-base font-bold text-slate-900">Contratos</h2><p className="mt-1 text-sm text-slate-500">Contratos firmados y visibles según permisos del cliente.</p></div><ProjectDocumentUpload projectId={projectId} clientId={data.clientId} defaultType="SIGNED_CONTRACT" /></div><ProjectDocumentsList documents={documents} empty="Todavía no hay contratos firmados vinculados al proyecto." /></section>; }

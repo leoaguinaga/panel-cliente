@@ -1,0 +1,10 @@
+import Link from 'next/link';
+import { getClients } from '@/src/modules/clients/server/queries';
+import { StatusBadge } from '@/components/shared/StatusBadge';
+import { CreateClientSheet } from '@/components/internal/CreateSheets';
+
+export default async function ClientsPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  const { q } = await searchParams;
+  const clients = await getClients({ search: q });
+  return <section className="space-y-6"><div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm text-muted-foreground">Relaciones comerciales</p><h1 className="text-3xl font-semibold tracking-tight">Clientes</h1><p className="mt-1 text-sm text-muted-foreground">Empresas y personas con proyectos activos o históricos.</p></div><CreateClientSheet /></div><form className="flex gap-2"><input name="q" defaultValue={q} placeholder="Buscar por nombre, empresa o correo" className="w-full max-w-md rounded-md border bg-background px-3 py-2 text-sm" /><button className="rounded-md border px-4 py-2 text-sm">Buscar</button></form><div className="overflow-hidden rounded-xl border bg-card"><div className="grid grid-cols-[1.4fr_1fr_120px_100px] gap-4 border-b px-5 py-3 text-xs font-medium text-muted-foreground"><span>Cliente</span><span>Responsable</span><span>Estado</span><span>Proyectos</span></div>{clients.length === 0 ? <p className="px-5 py-14 text-center text-sm text-muted-foreground">No encontramos clientes con esos criterios.</p> : clients.map((client) => <Link href={`/internal/clients/${client.id}`} key={client.id} className="grid grid-cols-[1.4fr_1fr_120px_100px] gap-4 border-b px-5 py-4 text-sm last:border-0 hover:bg-muted/40"><span><b className="font-medium">{client.businessName || client.name}</b><small className="mt-1 block text-muted-foreground">{client.email || 'Sin correo'}</small></span><span className="text-muted-foreground">{client.responsibleWorker?.name || 'Sin asignar'}</span><span><StatusBadge status={client.status} /></span><span>{client._count.projects}</span></Link>)}</div></section>;
+}
