@@ -15,6 +15,7 @@ import {
   Building2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { formatLeadStatus, formatProjectPriority } from "@/lib/formatters";
 
 export default async function LeadsPage({
   searchParams,
@@ -182,13 +183,13 @@ export default async function LeadsPage({
                                     : "bg-blue-50 text-blue-700 border-blue-200"
                             }`}
                           >
-                            {lead.priority}
+                            {formatProjectPriority(lead.priority)}
                           </Badge>
                         </td>
 
                         <td className="px-5 py-3.5 whitespace-nowrap">
                           <span className="text-xs font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded">
-                            {lead.status}
+                            {formatLeadStatus(lead.status)}
                           </span>
                         </td>
 

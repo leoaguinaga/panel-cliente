@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import type { Lead } from '@/src/lib/api/contracts';
 import { backendFetch } from '@/src/lib/api/server';
 
 const payload = (formData: FormData) => ({
@@ -26,7 +27,7 @@ const refresh = (id?: string) => {
 };
 
 export async function createLeadAction(formData: FormData) {
-  const res = await backendFetch<any>('/leads', {
+  const res = await backendFetch<Lead>('/leads', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload(formData)),
@@ -36,7 +37,7 @@ export async function createLeadAction(formData: FormData) {
 }
 
 export async function updateLeadAction(id: string, formData: FormData) {
-  const res = await backendFetch<any>(`/leads/${id}`, {
+  const res = await backendFetch<Lead>(`/leads/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload(formData)),
@@ -46,7 +47,7 @@ export async function updateLeadAction(id: string, formData: FormData) {
 }
 
 export async function changeLeadStatusAction(id: string, status: string) {
-  const res = await backendFetch<any>(`/leads/${id}/status`, {
+  const res = await backendFetch<Lead>(`/leads/${id}/status`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status }),
@@ -56,14 +57,14 @@ export async function changeLeadStatusAction(id: string, status: string) {
 }
 
 export async function markLeadAsLostAction(id: string) {
-  return changeLeadStatusAction(id, 'LOST');
+  await changeLeadStatusAction(id, 'LOST');
 }
 
-export async function convertLeadToProjectAction(leadId: string, projectName?: string, price?: number, responsibleWorkerId?: string | null) {
-  const res = await backendFetch<any>(`/leads/${leadId}/convert`, {
+export async function convertLeadToProjectAction(leadId: string, projectName?: string, price?: number, responsibleWorkerId?: string | null, projectType?: string) {
+  const res = await backendFetch<{ success: boolean; project: { id: string } }>(`/leads/${leadId}/convert`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ projectName, price, responsibleWorkerId }),
+    body: JSON.stringify({ projectName, price, responsibleWorkerId, projectType }),
   });
   refresh(leadId);
   return res;

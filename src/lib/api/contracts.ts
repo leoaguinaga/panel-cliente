@@ -1,0 +1,10 @@
+import type { LeadItem } from '@/components/kanban/LeadKanban';
+import type { ProjectSummary, ProjectTask, ProjectDocument, ProjectPayment } from '@/src/modules/projects/types';
+export type Worker = { id: string; name: string; email: string; phone: string | null; role: 'ADMIN' | 'WORKER'; status: string; _count: { assignedProjects: number; assignedTasks: number } };
+export type Lead = LeadItem & { clientId: string | null; convertedProjectId: string | null; project: { id: string; name: string } | null; demos: { id: string; product: { name: string } }[]; updatedAt: string; lastContactAt: string | null };
+export type Client = { id: string; name: string; businessName: string | null; email: string | null; phone: string | null; documentType: string | null; documentNumber: string | null; address: string | null; website: string | null; status: string; notes: string | null; whatsapp: string | null; responsibleWorkerId: string | null; responsibleWorker: Worker | null; assignedToId: string | null; assignedTo: Worker | null; createdAt: string; _count: { projects: number; payments: number } };
+export type Payment = ProjectPayment & { dueDate: string | null; paidAt: string | null; client: Client; project: { id: string; name: string } | null };
+export type ClientDetail = Client & { projects: ProjectSummary[]; documents: (ProjectDocument & { archivedAt: string | null })[]; payments: Payment[]; leads: Lead[] };
+export type Activity = { id: string; description: string | null; entityType: string; action: string; actor: { name: string } | null; createdAt: string };
+export type Task = ProjectTask & { project: { id: string; name: string } };
+export type Project = ProjectSummary & { client: Client; tasks: ProjectTask[]; updatedAt: string; startDate: string | null; estimatedEndDate: string | null };

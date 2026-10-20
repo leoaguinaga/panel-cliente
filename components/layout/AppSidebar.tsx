@@ -5,7 +5,8 @@ import {
   LayoutDashboard,
   UsersRound,
   Users,
-  Briefcase,
+  ListChecks,
+  FolderKanban,
   Box,
   FileText,
   CreditCard,
@@ -45,7 +46,7 @@ const ServicesIcon = React.forwardRef<SVGSVGElement, React.SVGProps<SVGSVGElemen
 
 const teams = [
   {
-    name: "Foxcode",
+    name: "FoxCode",
     logo: FoxcodeLogoIcon,
     plan: "Panel Operativo",
   },
@@ -57,15 +58,11 @@ const navMain = [
     url: ROUTES.internal.dashboard,
     icon: LayoutDashboard,
   },
+  { title: "Tareas", url: "/internal/tasks", icon: ListChecks },
   {
     title: "Proyectos",
     url: ROUTES.internal.projects,
-    icon: Briefcase,
-  },
-  {
-    title: "Clientes",
-    url: ROUTES.internal.clients,
-    icon: Users,
+    icon: FolderKanban,
   },
   {
     title: "Leads",
@@ -73,18 +70,23 @@ const navMain = [
     icon: Flame,
   },
   {
-    title: "Productos",
-    url: ROUTES.internal.products,
-    icon: Box,
-  },
-  {
-    title: "Servicios",
-    url: ROUTES.internal.services,
-    icon: ServicesIcon,
+    title: "Clientes",
+    url: ROUTES.internal.clients,
+    icon: Users,
   },
 ]
 
 const navSecondary = [
+  {
+    name: "Productos",
+    url: ROUTES.internal.products,
+    icon: Box,
+  },
+  {
+    name: "Servicios",
+    url: ROUTES.internal.services,
+    icon: ServicesIcon,
+  },
   {
     name: "Documentos",
     url: ROUTES.internal.documents,

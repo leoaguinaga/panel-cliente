@@ -4,9 +4,13 @@ import { registerBones } from 'boneyard-js'
 import { configureBoneyard } from 'boneyard-js/react'
 
 import _project_summary from './project-summary.bones.json'
+import _client_portal from './client-portal.bones.json'
+import _product_demos from './product-demos.bones.json'
 
 configureBoneyard({"color":"#e5e7eb","darkColor":"#2a2a2a","animate":"shimmer","shimmerColor":"#f3f4f6","darkShimmerColor":"#333333","speed":"2s","transition":200})
 
 registerBones({
   "project-summary": _project_summary,
+  "client-portal": _client_portal,
+  "product-demos": _product_demos,
 })

@@ -43,8 +43,11 @@ export default function LoginPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="text-center text-gray-500 mb-4">
-        Inicia sesión para acceder al portal
+      <div className="text-center mb-4">
+        <h1 className="font-heading text-2xl font-semibold tracking-[-0.02em] text-gray-900">
+          Inicia sesión
+        </h1>
+        <p className="mt-1 text-sm text-gray-500">Accede al portal de tus proyectos</p>
       </div>
       
       {error && (

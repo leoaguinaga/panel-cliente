@@ -1,3 +1,5 @@
+import type { Lead, Worker, Client } from '@/src/lib/api/contracts';
+import { allPages } from '@/src/lib/api/pagination';
 import { backendFetch } from '@/src/lib/api/server';
 
 export async function getLeads(filters?: { status?: string; type?: string; priority?: string; zone?: string; q?: string }) {
@@ -7,18 +9,18 @@ export async function getLeads(filters?: { status?: string; type?: string; prior
   if (filters?.priority) query.set('priority', filters.priority);
   if (filters?.zone) query.set('zone', filters.zone);
   if (filters?.q) query.set('q', filters.q);
-  return backendFetch<any[]>(`/leads${query.size ? `?${query}` : ''}`);
+  return backendFetch<Lead[]>(`/leads${query.size ? `?${query}` : ''}`);
 }
 
 export async function getLeadById(id: string) {
-  return backendFetch<any>(`/leads/${id}`);
+  return backendFetch<Lead>(`/leads/${id}`);
 }
 
 export async function getWorkers() {
-  return backendFetch<any[]>('/directory/workers');
+  return backendFetch<Pick<Worker, 'id' | 'name' | 'email'>[]>('/directory/workers');
 }
 
 export async function getClients() {
-  return backendFetch<any[]>('/clients');
+  return allPages<Client>('/clients');
 }
 

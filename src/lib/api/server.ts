@@ -5,6 +5,6 @@ export class BackendApiError extends Error { constructor(public readonly status:
 export async function backendFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const requestHeaders = await headers();
   const response = await fetch(`${baseUrl}${path}`, { ...init, signal: init.signal || AbortSignal.timeout(10_000), headers: { Accept: 'application/json', Cookie: requestHeaders.get('cookie') || '', ...init.headers }, cache: 'no-store' });
-  if (!response.ok) { const data = await response.json().catch(() => null); throw new BackendApiError(response.status, data?.message || 'No fue posible completar la operación'); }
+  if (!response.ok) { const data = await response.json().catch(() => null); throw new BackendApiError(response.status, Array.isArray(data?.message) ? data.message.join('. ') : data?.message || 'No fue posible completar la operación'); }
   return response.json() as Promise<T>;
 }

@@ -133,7 +133,7 @@ export function SprintManager({
                       <h4 className="font-bold text-sm text-slate-900 line-clamp-1">{sprint.name}</h4>
                       {sprint.goal && (
                         <p className="text-xs text-slate-500 mt-1 line-clamp-2 italic">
-                          "{sprint.goal}"
+                          &quot;{sprint.goal}&quot;
                         </p>
                       )}
                     </div>

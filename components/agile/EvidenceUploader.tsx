@@ -15,11 +15,13 @@ export type TaskEvidenceItem = {
   uploadedBy?: { id: string; name: string } | null;
 };
 
+const EMPTY_EVIDENCES: TaskEvidenceItem[] = [];
+
 export function EvidenceModal({
   projectId,
   taskId,
   taskTitle,
-  evidences = [],
+  evidences = EMPTY_EVIDENCES,
   isOpen,
   onClose,
 }: {
@@ -38,9 +40,11 @@ export function EvidenceModal({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const [previousEvidences, setPreviousEvidences] = useState(evidences);
+  if (previousEvidences !== evidences) {
+    setPreviousEvidences(evidences);
     setItems(evidences);
-  }, [evidences]);
+  }
 
   // Handle Ctrl+V / Clipboard Paste of Screenshot
   useEffect(() => {
@@ -107,8 +111,8 @@ export function EvidenceModal({
         setFileUrl('');
         setTitle('');
         setNotes('');
-      } catch (err: any) {
-        setError(err?.message || 'Error al guardar evidencia');
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Error al guardar evidencia');
       }
     });
   };
@@ -118,8 +122,8 @@ export function EvidenceModal({
       try {
         await deleteTaskEvidenceAction(projectId, taskId, evidenceId);
         setItems((prev) => prev.filter((it) => it.id !== evidenceId));
-      } catch (err: any) {
-        setError(err?.message || 'Error al eliminar');
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Error al eliminar');
       }
     });
   };

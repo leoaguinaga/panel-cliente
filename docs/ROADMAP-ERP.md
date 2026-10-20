@@ -1,5 +1,7 @@
 # Roadmap ERP operativo Foxcode
 
+> **Estado de implementación:** para la planificación vigente y el avance comprobado, consultar [PLAN-ITERACIONES-ACTUALIZADO.md](./PLAN-ITERACIONES-ACTUALIZADO.md). Este documento conserva la dirección del producto y el historial de alcance.
+
 ## Dirección
 
 El panel es principalmente una herramienta interna de operación para Foxcode. El portal de cliente será una vista externa, reducida y controlada, sobre los datos que el equipo gestione internamente.

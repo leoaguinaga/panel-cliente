@@ -19,13 +19,13 @@ import {
 export type PaymentScheduleItem = {
   id: string;
   concept: string;
-  amount: any;
-  percentage?: any;
+  amount: number | string;
+  percentage?: number | string | null;
   currency: string;
-  status: 'PENDING' | 'PARTIAL' | 'PAID' | 'OVERDUE' | 'CANCELLED';
-  dueDate: string | null;
-  paidAt: string | null;
-  notes: string | null;
+  status: string;
+  dueDate?: string | null;
+  paidAt?: string | null;
+  notes?: string | null;
   milestone?: { id: string; title: string; status: string } | null;
 };
 
@@ -43,7 +43,7 @@ export function PaymentConditions({
 }: {
   projectId: string;
   projectPrice: number;
-  payments: any[];
+  payments: PaymentScheduleItem[];
 }) {
   const [totalPrice, setTotalPrice] = useState<string>(String(projectPrice || '1500'));
   const [selectedPreset, setSelectedPreset] = useState<string>('SPLIT_50_50');
@@ -70,9 +70,9 @@ export function PaymentConditions({
   };
 
   // Calculations
-  const totalAmount = payments.reduce((acc: number, p: any) => acc + Number(p.amount || 0), 0);
-  const paidAmount = payments.filter((p: any) => p.status === 'PAID').reduce((acc: number, p: any) => acc + Number(p.amount || 0), 0);
-  const pendingAmount = payments.filter((p: any) => p.status === 'PENDING' || p.status === 'PARTIAL').reduce((acc: number, p: any) => acc + Number(p.amount || 0), 0);
+  const totalAmount = payments.reduce((acc: number, p: PaymentScheduleItem) => acc + Number(p.amount || 0), 0);
+  const paidAmount = payments.filter((p: PaymentScheduleItem) => p.status === 'PAID').reduce((acc: number, p: PaymentScheduleItem) => acc + Number(p.amount || 0), 0);
+  const pendingAmount = payments.filter((p: PaymentScheduleItem) => p.status === 'PENDING' || p.status === 'PARTIAL').reduce((acc: number, p: PaymentScheduleItem) => acc + Number(p.amount || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -180,7 +180,7 @@ export function PaymentConditions({
           </div>
         ) : (
           <div className="divide-y">
-            {payments.map((p: any, idx: number) => (
+            {payments.map((p: PaymentScheduleItem, idx: number) => (
               <div key={p.id} className="p-4 flex flex-wrap items-center justify-between gap-3 hover:bg-slate-50/50 transition-colors">
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2">

@@ -1,37 +1,5 @@
-import { betterAuth } from "better-auth";
-import { prismaAdapter } from "better-auth/adapters/prisma";
-import { prisma } from "./prisma";
-import { ROLES, Role } from "../modules/auth/server/permissions";
+import { ROLES, Role } from '../modules/auth/server/permissions';
 import { BackendApiError, backendFetch } from './api/server';
-
-export const auth = betterAuth({
-  baseURL: process.env.BETTER_AUTH_URL,
-  database: prismaAdapter(prisma, {
-    provider: "postgresql",
-  }),
-  emailAndPassword: {
-    enabled: true,
-  },
-  user: {
-    additionalFields: {
-      role: {
-        type: "string",
-        required: true,
-        defaultValue: ROLES.CLIENT,
-      },
-      status: {
-        type: "string",
-        required: true,
-        defaultValue: "ACTIVE",
-      },
-      clientId: {
-        type: "string",
-        required: false,
-      },
-    },
-  },
-});
-
 export async function getSession() {
   try {
     return await backendFetch<{
@@ -42,6 +10,7 @@ export async function getSession() {
         name?: string;
         email?: string;
         image?: string | null;
+        clientId?: string | null;
       };
     }>('/auth/session');
   } catch (error) {

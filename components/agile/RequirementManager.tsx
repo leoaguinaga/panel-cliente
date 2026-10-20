@@ -20,11 +20,11 @@ import {
 
 export type RequirementItem = {
   id: string;
-  projectId: string;
+  projectId?: string;
   code: string | null;
   title: string;
-  description: string | null;
-  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  description?: string | null;
+  priority?: string;
   tasks?: Array<{ id: string; title: string; status: string; priority: string }>;
 };
 
@@ -38,9 +38,9 @@ export function RequirementManager({
   workers = [],
 }: {
   projectId: string;
-  requirements: any[];
-  sprints?: any[];
-  workers?: any[];
+  requirements: RequirementItem[];
+  sprints?: Sprint[];
+  workers?: Worker[];
 }) {
   const [newReqOpen, setNewReqOpen] = useState(false);
   const [code, setCode] = useState('');
@@ -64,7 +64,7 @@ export function RequirementManager({
     formData.append('code', code.trim());
     formData.append('title', title.trim());
     formData.append('description', description.trim());
-    formData.append('priority', priority);
+    formData.append('priority', priority || 'MEDIUM');
 
     startTransition(async () => {
       await createRequirementAction(projectId, formData);
@@ -84,7 +84,7 @@ export function RequirementManager({
     formData.append('requirementId', breakdownReq.id);
     if (taskSprintId) formData.append('sprintId', taskSprintId);
     if (taskWorkerId) formData.append('assignedToId', taskWorkerId);
-    formData.append('priority', breakdownReq.priority);
+    formData.append('priority', breakdownReq.priority || 'MEDIUM');
 
     startTransition(async () => {
       await createTaskAction(projectId, formData);
@@ -133,9 +133,9 @@ export function RequirementManager({
         </div>
       ) : (
         <div className="space-y-3">
-          {requirements.map((req: any) => {
+          {requirements.map((req: RequirementItem) => {
             const reqTasks = req.tasks || [];
-            const doneTasks = reqTasks.filter((t: any) => t.status === 'DONE');
+            const doneTasks = reqTasks.filter((t) => t.status === 'DONE');
 
             return (
               <div
@@ -193,11 +193,11 @@ export function RequirementManager({
 
                   {reqTasks.length === 0 ? (
                     <p className="text-[11px] text-slate-400 italic py-1">
-                      Sin tareas desglosadas. Haz clic en "Desglosar en Tarea" para comenzar la ejecución.
+                      Sin tareas desglosadas. Haz clic en &quot;Desglosar en Tarea&quot; para comenzar la ejecución.
                     </p>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                      {reqTasks.map((t: any) => (
+                      {reqTasks.map((t) => (
                         <div
                           key={t.id}
                           className="flex items-center justify-between gap-2 bg-white px-2.5 py-1.5 rounded border text-xs shadow-xs"

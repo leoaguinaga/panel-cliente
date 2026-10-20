@@ -15,6 +15,7 @@ export default async function InternalDashboardPage({ searchParams }: { searchPa
   const attentionCount = dashboard.overdueTasks.length + dashboard.blockedTasks.length + dashboard.unassignedProjects.length;
   return <section className="space-y-7">
     <header className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm text-muted-foreground">Centro operativo</p><h1 className="text-3xl font-semibold tracking-tight text-balance">Qué necesita atención hoy</h1><p className="mt-1 max-w-2xl text-sm text-muted-foreground">Prioriza vencimientos, bloqueos y responsabilidades antes de revisar el estado general.</p></div><CreateProjectSheet clients={clients} /></header>
+    <nav aria-label="Bandejas de trabajo" className="flex flex-wrap gap-4 text-sm"><Link className="underline" href="/internal/tasks?due=overdue">Todas las tareas vencidas</Link><Link className="underline" href="/internal/tasks?status=BLOCKED">Todas las bloqueadas</Link><Link className="underline" href="/internal/tasks?workerId=unassigned">Tareas sin responsable</Link><Link className="underline" href="/internal/projects?workerId=unassigned">Proyectos sin responsable</Link></nav>
     <DashboardFilters
       workers={dashboard.workers}
       products={dashboard.products}

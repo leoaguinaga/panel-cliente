@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useHorizontalDragScroll } from '@/hooks/use-horizontal-drag-scroll';
-import { formatCompactDate } from '@/lib/formatters';
+import { formatProjectPriority, leadStatusLabels, defaultProjectTypeForLead, formatCompactDate, formatProjectType, isWebsiteProjectType, projectTypeOptions } from '@/lib/formatters';
 import {
   Sheet,
   SheetClose,
@@ -57,6 +57,8 @@ const COLUMNS: Array<{
   dotColor: string;
   columnBg: string;
   headerColor: string;
+  /** Inbound statuses (landing, referrals) only render when they hold leads. */
+  inbound?: boolean;
 }> = [
     {
       id: 'MAPPED',
@@ -73,11 +75,43 @@ const COLUMNS: Array<{
       headerColor: 'text-slate-700',
     },
     {
+      id: 'NEW',
+      title: 'Nuevo',
+      dotColor: 'bg-sky-600',
+      columnBg: 'bg-[#F2F8FD] border-sky-100/70',
+      headerColor: 'text-slate-700',
+      inbound: true,
+    },
+    {
+      id: 'CONTACTED',
+      title: 'Contactado',
+      dotColor: 'bg-indigo-500',
+      columnBg: 'bg-[#F5F5FE] border-indigo-100/70',
+      headerColor: 'text-slate-700',
+      inbound: true,
+    },
+    {
+      id: 'MEETING_SCHEDULED',
+      title: 'Reunión agendada',
+      dotColor: 'bg-violet-500',
+      columnBg: 'bg-[#F7F5FF] border-violet-100/70',
+      headerColor: 'text-slate-700',
+      inbound: true,
+    },
+    {
       id: 'PRESENTED',
       title: 'Contactado / Demo',
       dotColor: 'bg-purple-600',
       columnBg: 'bg-[#F7F5FF] border-purple-100/70',
       headerColor: 'text-slate-700',
+    },
+    {
+      id: 'QUOTED',
+      title: 'Cotizado',
+      dotColor: 'bg-orange-500',
+      columnBg: 'bg-[#FFF8F2] border-orange-100/70',
+      headerColor: 'text-slate-700',
+      inbound: true,
     },
     {
       id: 'FEEDBACK_CHANGES',
@@ -123,6 +157,7 @@ export function LeadKanban({
   const [convertModalOpen, setConvertModalOpen] = useState(false);
   const [selectedLeadForConvert, setSelectedLeadForConvert] = useState<LeadItem | null>(null);
   const [convertProjectName, setConvertProjectName] = useState('');
+  const [convertProjectType, setConvertProjectType] = useState('WEBSITE');
   const [convertPrice, setConvertPrice] = useState('1500');
   const [convertWorkerId, setConvertWorkerId] = useState('');
   const [convertSuccess, setConvertSuccess] = useState<string | null>(null);
@@ -180,11 +215,8 @@ export function LeadKanban({
     // If dropped into WON, trigger modal prompt
     if (targetStatus === 'WON') {
       setSelectedLeadForConvert(lead);
-      setConvertProjectName(
-        lead.companyName
-          ? `Sitio Web - ${lead.companyName}`
-          : `Sitio Web - ${lead.name}`
-      );
+      setConvertProjectType(defaultProjectTypeForLead(lead.type));
+      setConvertProjectName('');
       setConvertWorkerId(lead.assignedTo?.id || '');
       setConvertModalOpen(true);
     }
@@ -210,7 +242,8 @@ export function LeadKanban({
           selectedLeadForConvert.id,
           convertProjectName,
           Number(convertPrice) || 0,
-          convertWorkerId || null
+          convertWorkerId || null,
+          convertProjectType
         );
         if (res?.project?.id) {
           setConvertSuccess(
@@ -222,8 +255,8 @@ export function LeadKanban({
         } else {
           setConvertModalOpen(false);
         }
-      } catch (err: any) {
-        setConvertError(err?.message || 'Error al convertir prospecto');
+      } catch (err: unknown) {
+        setConvertError(err instanceof Error ? err.message : 'Error al convertir prospecto');
       }
     });
   };
@@ -269,8 +302,8 @@ export function LeadKanban({
       try {
         await updateLeadAction(selectedLeadForEdit.id, formData);
         setEditSheetOpen(false);
-      } catch (err: any) {
-        setEditError(err?.message || 'Error al actualizar la información del prospecto');
+      } catch (err: unknown) {
+        setEditError(err instanceof Error ? err.message : 'Error al actualizar la información del prospecto');
       }
     });
   };
@@ -280,25 +313,25 @@ export function LeadKanban({
       case 'URGENT':
         return (
           <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-100">
-            Urgent
+            {formatProjectPriority('URGENT')}
           </span>
         );
       case 'HIGH':
         return (
           <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100">
-            High
+            {formatProjectPriority('HIGH')}
           </span>
         );
       case 'LOW':
         return (
           <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-sky-50 text-sky-600 border border-sky-100">
-            Low
+            {formatProjectPriority('LOW')}
           </span>
         );
       default:
         return (
           <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-100">
-            Medium
+            {formatProjectPriority('MEDIUM')}
           </span>
         );
     }
@@ -339,7 +372,7 @@ export function LeadKanban({
         aria-label="Estados del flujo de prospectos"
         onKeyDown={handleBoardKeyDown}
       >
-        {COLUMNS.map((col) => {
+        {COLUMNS.filter((col) => !col.inbound || leads.some((l) => l.status === col.id)).map((col) => {
           const colLeads = leads.filter((l) => l.status === col.id);
           const isOver = dragOverColumn === col.id;
 
@@ -476,9 +509,7 @@ export function LeadKanban({
                           <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
                             <Calendar className="size-3.5 text-slate-400" />
                             <span>
-                              {lead.createdAt
-                                ? formatCompactDate(lead.createdAt)
-                                : 'Feb 28'}
+                              {formatCompactDate(lead.createdAt)}
                             </span>
                           </div>
 
@@ -488,11 +519,8 @@ export function LeadKanban({
                                 type="button"
                                 onClick={() => {
                                   setSelectedLeadForConvert(lead);
-                                  setConvertProjectName(
-                                    lead.companyName
-                                      ? `Sitio Web - ${lead.companyName}`
-                                      : `Sitio Web - ${lead.name}`
-                                  );
+      setConvertProjectType(defaultProjectTypeForLead(lead.type));
+      setConvertProjectName('');
                                   setConvertWorkerId(lead.assignedTo?.id || '');
                                   setConvertModalOpen(true);
                                 }}
@@ -583,10 +611,10 @@ export function LeadKanban({
                     defaultValue={selectedLeadForEdit.priority || 'MEDIUM'}
                     className={field}
                   >
-                    <option value="LOW">Low (Baja)</option>
-                    <option value="MEDIUM">Medium (Media)</option>
-                    <option value="HIGH">High (Alta)</option>
-                    <option value="URGENT">Urgent (Urgente)</option>
+                    <option value="LOW">Baja</option>
+                    <option value="MEDIUM">Media</option>
+                    <option value="HIGH">Alta</option>
+                    <option value="URGENT">Urgente</option>
                   </select>
                 </label>
               </div>
@@ -633,12 +661,7 @@ export function LeadKanban({
                     defaultValue={selectedLeadForEdit.status}
                     className={field}
                   >
-                    <option value="MAPPED">1. Mapeo en Zona</option>
-                    <option value="SITE_DEVELOPMENT">2. En Desarrollo Autónomo</option>
-                    <option value="PRESENTED">3. Contactado / Demo</option>
-                    <option value="FEEDBACK_CHANGES">4. En Negociación</option>
-                    <option value="WON">5. Aceptado / Ganado</option>
-                    <option value="LOST">6. Rechazado</option>
+                    {Object.entries(leadStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                   </select>
                 </label>
 
@@ -668,7 +691,7 @@ export function LeadKanban({
                 >
                   <option value="LANDING">Sitio Web / Landing Page</option>
                   <option value="SYSTEM">Software / Sistema a Medida</option>
-                  <option value="MOBILE">Aplicación Móvil</option>
+                  <option value="APP">Aplicación móvil</option>
                   <option value="FOXROOMS">FoxRooms</option>
                   <option value="GENERAL">General</option>
                 </select>
@@ -729,10 +752,10 @@ export function LeadKanban({
               <div>
                 <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                   <Sparkles className="size-5 text-amber-500" />
-                  Convertir Prospecto a Cliente y Proyecto
+                  Convertir en cliente y proyecto
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Se creará el Cliente formal y un Proyecto de tipo Sitio Web con su primer Sprint activo.
+                  Se creará el cliente y un proyecto del tipo elegido, con su primer sprint activo.
                 </p>
               </div>
               <button
@@ -747,10 +770,22 @@ export function LeadKanban({
             <form onSubmit={handleConvertSubmit} className="space-y-3.5">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Nombre del Proyecto
+                  Tipo de proyecto
+                </label>
+                <select
+                  value={convertProjectType}
+                  onChange={(e) => setConvertProjectType(e.target.value)}
+                  className="mb-3.5 w-full rounded-xl border bg-slate-50 px-3.5 py-2 text-xs outline-none focus:bg-white focus:ring-2 focus:ring-blue-600"
+                >
+                  {projectTypeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Nombre del proyecto
                 </label>
                 <input
-                  required
+                  placeholder={`${formatProjectType(convertProjectType)} - ${selectedLeadForConvert.companyName || selectedLeadForConvert.name}`}
                   value={convertProjectName}
                   onChange={(e) => setConvertProjectName(e.target.value)}
                   className="w-full rounded-xl border bg-slate-50 px-3.5 py-2 text-xs outline-none focus:bg-white focus:ring-2 focus:ring-blue-600"
@@ -795,8 +830,8 @@ export function LeadKanban({
               <div className="rounded-xl border bg-slate-50 p-3.5 text-xs space-y-1 text-slate-600">
                 <p className="font-semibold text-slate-800">Se generará automáticamente:</p>
                 <p>✓ Cliente activo con datos de contacto y demo asociado.</p>
-                <p>✓ Sprint 1: Setup & Kickoff (Estado: Activo).</p>
-                <p>✓ Requerimiento REQ-01: Personalización y Despliegue de Sitio Web.</p>
+                <p>✓ Sprint 1: Kickoff (activo).</p>
+                {isWebsiteProjectType(convertProjectType) && <p>✓ Requerimiento REQ-01: personalización y despliegue del sitio, con su primera tarea.</p>}
               </div>
 
               {convertError && (
@@ -827,7 +862,7 @@ export function LeadKanban({
                   size="sm"
                   className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
                 >
-                  {isPending ? 'Creando Proyecto...' : 'Confirmar y Crear Proyecto'}
+                  {isPending ? 'Creando proyecto…' : 'Crear cliente y proyecto'}
                 </Button>
               </div>
             </form>

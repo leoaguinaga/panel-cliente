@@ -1,16 +1,107 @@
+import { Pagination } from '@/components/shared/Pagination';
 import Link from 'next/link';
 import { DocumentUploadSheet } from '@/components/internal/DocumentUploadSheet';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { getClients } from '@/src/modules/clients/server/queries';
-import { getDocuments } from '@/src/modules/documents/server/queries';
+import { getDocumentsPage } from '@/src/modules/documents/server/queries';
 import { getProjectsOverview } from '@/src/modules/projects/server/queries';
-import { formatDate } from '@/lib/formatters';
+import { AdminDocumentsTable } from '@/components/internal/AdminDocumentsTable';
 
-const labels: Record<string, string> = { COMMERCIAL_PROPOSAL: 'Propuesta', SIGNED_CONTRACT: 'Contrato', INVOICE: 'Factura', PAYMENT_PROOF: 'Comprobante', DELIVERABLE: 'Entregable', INTERNAL_FILE: 'Interno', OTHER: 'Otro' };
-const formatSize = (bytes: number) => bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+const labels: Record<string, string> = {
+  COMMERCIAL_PROPOSAL: 'Propuesta',
+  SIGNED_CONTRACT: 'Contrato',
+  INVOICE: 'Factura',
+  PAYMENT_PROOF: 'Comprobante',
+  DELIVERABLE: 'Entregable',
+  INTERNAL_FILE: 'Interno',
+  OTHER: 'Otro',
+};
 
-export default async function DocumentsPage({ searchParams }: { searchParams: Promise<{ q?: string; type?: string; clientId?: string; projectId?: string }> }) {
+export default async function DocumentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; type?: string; clientId?: string; projectId?: string; page?: string; archived?: string }>;
+}) {
   const filters = await searchParams;
-  const [documents, clients, projects] = await Promise.all([getDocuments({ search: filters.q, type: filters.type, clientId: filters.clientId, projectId: filters.projectId }), getClients(), getProjectsOverview()]);
-  return <section className="space-y-6"><header className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm text-muted-foreground">Archivos y evidencia</p><h1 className="text-3xl font-semibold tracking-tight">Documentos</h1><p className="mt-1 max-w-2xl text-sm text-muted-foreground">Centraliza contratos, propuestas, entregables y archivos de operación.</p></div><DocumentUploadSheet clients={clients} projects={projects} /></header><form className="flex flex-wrap gap-2 rounded-xl border bg-card p-3"><input name="q" defaultValue={filters.q} placeholder="Buscar documento, cliente o proyecto" className="min-w-56 flex-1 rounded-md border bg-background px-3 py-2 text-sm" /><select name="type" defaultValue={filters.type || ''} className="rounded-md border bg-background px-3 py-2 text-sm"><option value="">Todos los tipos</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><select name="clientId" defaultValue={filters.clientId || ''} className="rounded-md border bg-background px-3 py-2 text-sm"><option value="">Todos los clientes</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.businessName || client.name}</option>)}</select><button className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted">Filtrar</button><Link href="/internal/documents" className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground">Limpiar</Link></form><div className="overflow-hidden rounded-xl border bg-card"><div className="grid grid-cols-[minmax(14rem,1.4fr)_minmax(10rem,0.9fr)_auto] gap-4 border-b px-5 py-3 text-xs font-medium text-muted-foreground"><span>Documento</span><span>Contexto</span><span>Acciones</span></div>{documents.length === 0 ? <EmptyState title="No hay documentos con estos filtros" description="Sube el primer archivo para dejar evidencia vinculada a un cliente o proyecto." action={<DocumentUploadSheet clients={clients} projects={projects} />} /> : <div className="divide-y">{documents.map((doc) => <div key={doc.id} className="grid grid-cols-[minmax(14rem,1.4fr)_minmax(10rem,0.9fr)_auto] gap-4 px-5 py-4 text-sm"><div className="min-w-0"><p className="truncate font-medium">{doc.originalName}</p><p className="mt-1 text-xs text-muted-foreground">{labels[doc.type]} · {formatSize(doc.size)} · Subido por {doc.uploadedBy.name} el {formatDate(doc.createdAt)}</p></div><div className="min-w-0"><p className="truncate text-muted-foreground">{doc.project?.name || doc.client?.businessName || doc.client?.name || 'Sin asociación'}</p>{doc.visibleToClient && <span className="mt-1 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">Visible para cliente</span>}</div><Link href={`/api/uploads/${doc.id}`} className="self-start rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted">Descargar</Link></div>)}</div>}</div></section>;
+  const [documentPage, clients, projects] = await Promise.all([
+    getDocumentsPage({
+      q: filters.q,
+      type: filters.type,
+      clientId: filters.clientId,
+      projectId: filters.projectId,
+      page: filters.page,
+      archived: filters.archived,
+    }),
+    getClients(),
+    getProjectsOverview(),
+  ]);
+
+  return (
+    <section className="space-y-6">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-sm text-muted-foreground">Archivos y evidencia</p>
+          <h1 className="text-3xl font-semibold tracking-tight">Documentos</h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Centraliza contratos, propuestas, entregables y archivos de operación con visor de Word (.docx), imágenes y PDF.
+          </p>
+        </div>
+        <DocumentUploadSheet clients={clients} projects={projects} />
+      </header>
+
+      <form className="flex flex-wrap gap-2 rounded-2xl border bg-card p-3 shadow-xs">
+        <input
+          name="q" aria-label="Buscar documentos"
+          defaultValue={filters.q}
+          placeholder="Buscar documento, cliente o proyecto"
+          className="min-w-56 flex-1 rounded-xl border bg-background px-3 py-2 text-sm"
+        />
+        <select
+          name="type" aria-label="Tipo de documento"
+          defaultValue={filters.type || ''}
+          className="rounded-xl border bg-background px-3 py-2 text-sm"
+        >
+          <option value="">Todos los tipos</option>
+          {Object.entries(labels).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <select
+          name="clientId" aria-label="Cliente"
+          defaultValue={filters.clientId || ''}
+          className="rounded-xl border bg-background px-3 py-2 text-sm"
+        >
+          <option value="">Todos los clientes</option>
+          {clients.map((client) => (
+            <option key={client.id} value={client.id}>
+              {client.businessName || client.name}
+            </option>
+          ))}
+        </select>
+        <button className="rounded-xl border bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50">
+          Filtrar
+        </button>
+        <Link
+          href="/internal/documents"
+          className="flex items-center px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
+        >
+          Limpiar
+        </Link>
+      </form>
+
+      <form className="flex items-center gap-3 text-sm"><label><input type="checkbox" name="archived" value="true" defaultChecked={filters.archived === 'true'} /> Ver archivados</label><button className="rounded-md border p-2">Aplicar</button></form>
+      {documentPage.items.length === 0 ? (
+        <EmptyState
+          title="No hay documentos con estos filtros"
+          description="Sube el primer archivo para dejar evidencia vinculada a un cliente o proyecto."
+          action={<DocumentUploadSheet clients={clients} projects={projects} />}
+        />
+      ) : (
+        <AdminDocumentsTable documents={documentPage.items} />
+      )}
+      <Pagination total={documentPage.total} page={documentPage.page} query={filters} />
+    </section>
+  );
 }

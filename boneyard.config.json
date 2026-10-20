@@ -1,5 +1,9 @@
 {
-  "breakpoints": [375, 768, 1280],
+  "breakpoints": [
+    375,
+    768,
+    1280
+  ],
   "out": "./src/bones",
   "wait": 800,
   "color": "#e5e7eb",
@@ -9,5 +13,9 @@
   "darkShimmerColor": "#333333",
   "speed": "2s",
   "transition": 200,
-  "routes": ["/boneyard-fixtures/project-summary"]
+  "routes": [
+    "/boneyard-fixtures/project-summary",
+    "/boneyard-fixtures/client-portal",
+    "/boneyard-fixtures/product-demos"
+  ]
 }

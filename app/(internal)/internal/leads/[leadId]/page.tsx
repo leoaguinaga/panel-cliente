@@ -1,3 +1,5 @@
+import { convertLeadToClientAction } from '@/src/modules/clients/server/actions';
+import { ActionForm } from '@/components/shared/ActionForm';
 import { getLeadById } from '@/src/modules/leads/server/queries';
 import { changeLeadStatusAction, markLeadAsLostAction, convertLeadToProjectAction } from '@/src/modules/leads/server/actions';
 import Link from 'next/link';
@@ -15,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { leadStatusLabels, defaultProjectTypeForLead, formatDate, formatProjectPriority, projectTypeOptions } from '@/lib/formatters';
 
 export default async function LeadDetailPage({
   params,
@@ -28,9 +31,9 @@ export default async function LeadDetailPage({
     notFound();
   }
 
-  async function handleConvert() {
+  async function handleConvert(formData: FormData) {
     'use server';
-    const res = await convertLeadToProjectAction(leadId);
+    const res = await convertLeadToProjectAction(leadId, undefined, undefined, undefined, String(formData.get('projectType') || ''));
     if (res?.project?.id) {
       redirect(`/internal/projects/${res.project.id}`);
     }
@@ -59,7 +62,7 @@ export default async function LeadDetailPage({
                   : 'bg-blue-50 text-blue-700 border-blue-200'
               }`}
             >
-              Prioridad {lead.priority}
+              Prioridad {formatProjectPriority(lead.priority).toLowerCase()}
             </Badge>
           </div>
         </div>
@@ -77,10 +80,14 @@ export default async function LeadDetailPage({
           )}
 
           {lead.status !== 'WON' && (
-            <form action={handleConvert}>
+            <form action={handleConvert} className="flex flex-wrap items-center gap-2">
+              <label className="sr-only" htmlFor="convert-project-type">Tipo de proyecto</label>
+              <select id="convert-project-type" name="projectType" defaultValue={defaultProjectTypeForLead(lead.type)} className="h-8 rounded-md border bg-white px-2 text-xs">
+                {projectTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
               <Button type="submit" size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5">
                 <Sparkles className="w-3.5 h-3.5" />
-                Convertir a Cliente + Proyecto
+                Convertir en cliente y proyecto
               </Button>
             </form>
           )}
@@ -189,12 +196,7 @@ export default async function LeadDetailPage({
                   defaultValue={lead.status}
                   className="w-full px-3 py-2 border border-slate-200 rounded-md text-xs font-medium bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary"
                 >
-                  <option value="MAPPED">1. Mapeo en Zona</option>
-                  <option value="SITE_DEVELOPMENT">2. En Desarrollo Autónomo</option>
-                  <option value="PRESENTED">3. Contactado / Presentado</option>
-                  <option value="FEEDBACK_CHANGES">4. En Negociación / Cambios</option>
-                  <option value="WON">5. Aceptado / Ganado</option>
-                  <option value="LOST">6. Rechazado / Perdido</option>
+                  {Object.entries(leadStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select>
               </div>
 
@@ -215,13 +217,14 @@ export default async function LeadDetailPage({
               <div className="flex justify-between py-1">
                 <dt className="text-slate-500">Fecha de Registro</dt>
                 <dd className="font-semibold text-slate-800">
-                  {lead.createdAt ? new Date(lead.createdAt).toLocaleDateString() : '-'}
+                  {formatDate(lead.createdAt)}
                 </dd>
               </div>
             </dl>
           </div>
         </div>
       </div>
+      {lead.status !== 'WON' && <section className="space-y-3 rounded-xl border p-5"><h2 className="font-medium">Convertir solo a cliente o con proyecto personalizado</h2><ActionForm action={convertLeadToClientAction.bind(null,lead.id)} className="space-y-3"><label className="block text-sm">Proyecto opcional<input name="projectName" className="mt-1 w-full rounded-md border p-2" /></label><button className="rounded-md border px-4 py-2 text-sm">Convertir lead</button></ActionForm></section>}
     </div>
   );
 }

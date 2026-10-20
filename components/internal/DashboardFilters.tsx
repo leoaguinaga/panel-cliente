@@ -22,7 +22,7 @@ import {
   Loader2,
 } from 'lucide-react';
 
-type EntityOption = { id: string; name: string } | Record<string, any>;
+type EntityOption = { id: string; name: string };
 
 type DashboardFiltersProps = {
   workers: EntityOption[];
@@ -140,7 +140,7 @@ export function DashboardFilters({
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {/* Responsable */}
         <div className="space-y-1.5">
-          <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <label htmlFor="dashboard-worker" className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             <User className="size-3.5 text-muted-foreground/80" />
             <span>Responsable</span>
           </label>
@@ -149,7 +149,8 @@ export function DashboardFilters({
             onValueChange={(val) => updateFilter('workerId', val)}
             disabled={isPending}
           >
-            <SelectTrigger
+            <SelectTrigger id="dashboard-worker"
+              aria-label="Responsable"
               className={
                 currentWorkerId
                   ? 'border-primary/50 bg-primary/5 font-medium text-foreground'
@@ -171,7 +172,7 @@ export function DashboardFilters({
 
         {/* Producto */}
         <div className="space-y-1.5">
-          <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <label htmlFor="dashboard-product" className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             <Package className="size-3.5 text-muted-foreground/80" />
             <span>Producto</span>
           </label>
@@ -180,7 +181,8 @@ export function DashboardFilters({
             onValueChange={(val) => updateFilter('productId', val)}
             disabled={isPending}
           >
-            <SelectTrigger
+            <SelectTrigger id="dashboard-product"
+              aria-label="Producto"
               className={
                 currentProductId
                   ? 'border-primary/50 bg-primary/5 font-medium text-foreground'
@@ -202,7 +204,7 @@ export function DashboardFilters({
 
         {/* Servicio */}
         <div className="space-y-1.5">
-          <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <label htmlFor="dashboard-service" className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             <Briefcase className="size-3.5 text-muted-foreground/80" />
             <span>Servicio</span>
           </label>
@@ -211,7 +213,8 @@ export function DashboardFilters({
             onValueChange={(val) => updateFilter('serviceId', val)}
             disabled={isPending}
           >
-            <SelectTrigger
+            <SelectTrigger id="dashboard-service"
+              aria-label="Servicio"
               className={
                 currentServiceId
                   ? 'border-primary/50 bg-primary/5 font-medium text-foreground'
@@ -233,7 +236,7 @@ export function DashboardFilters({
 
         {/* Estado */}
         <div className="space-y-1.5">
-          <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <label htmlFor="dashboard-status" className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             <Activity className="size-3.5 text-muted-foreground/80" />
             <span>Estado del proyecto</span>
           </label>
@@ -242,7 +245,8 @@ export function DashboardFilters({
             onValueChange={(val) => updateFilter('status', val)}
             disabled={isPending}
           >
-            <SelectTrigger
+            <SelectTrigger id="dashboard-status"
+              aria-label="Estado del proyecto"
               className={
                 currentStatus
                   ? 'border-primary/50 bg-primary/5 font-medium text-foreground'

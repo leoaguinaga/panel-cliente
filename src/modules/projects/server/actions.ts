@@ -11,7 +11,7 @@ const refresh = (projectId?: string) => {
 };
 
 export async function createProjectAction(formData: FormData) {
-  const res = await backendFetch<any>('/projects', {
+  const res = await backendFetch<{ id: string }>('/projects', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -35,7 +35,8 @@ export async function updateProjectAction(id: string, formData: FormData) {
       description: text(formData, 'description') || null,
       status: text(formData, 'status'),
       priority: text(formData, 'priority'),
-      progress: Number(formData.get('progress') || 0),
+      serviceId: text(formData, 'serviceId') || null,
+      productId: text(formData, 'productId') || null,
       price: Number(formData.get('price') || 0),
       responsibleWorkerId: text(formData, 'responsibleWorkerId') || null,
     }),

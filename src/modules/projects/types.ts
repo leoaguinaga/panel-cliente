@@ -25,7 +25,27 @@ export type ProjectMilestone = { id: string; title: string; description?: string
 export type ProjectScope = { id: string; summary?: string | null; inclusions?: string | null; exclusions?: string | null; assumptions?: string | null };
 export type ProjectDeliverable = { id: string; title: string; description?: string | null; dueDate?: string | null; completedAt?: string | null; visibleToClient: boolean };
 export type ProjectDocument = { id: string; type: string; originalName: string; mimeType: string; size: number; visibleToClient: boolean; createdAt: string; uploadedBy: { id?: string; name: string } };
-export type ProjectPayment = { id: string; concept: string; amount: number | string; percentage?: number | string | null; currency: string; status: string; dueDate?: string | null; paidAt?: string | null; notes?: string | null; milestoneId?: string | null; milestone?: { id: string; title: string; status: string } | null };
+export type ProjectPayment = {
+  id: string;
+  concept: string;
+  amount: number | string;
+  percentage?: number | string | null;
+  currency: string;
+  status: string;
+  dueDate?: string | null;
+  paidAt?: string | null;
+  paymentChannel?: string | null;
+  transactionReference?: string | null;
+  evidenceUrl?: string | null;
+  evidenceStorageKey?: string | null;
+  evidenceOriginalName?: string | null;
+  evidenceMimeType?: string | null;
+  clientNotes?: string | null;
+  reviewNotes?: string | null;
+  notes?: string | null;
+  milestoneId?: string | null;
+  milestone?: { id: string; title: string; status: string } | null;
+};
 
 export type ProjectTask = {
   id: string;

@@ -48,7 +48,7 @@ export function TeamSwitcher({
                 <img src="/favicon-light.webp" className="size-5.5" alt="" />
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">
+                <span className="truncate font-heading text-[15px] font-bold tracking-[-0.02em]">
                   {activeTeam.name}
                 </span>
                 <span className="truncate text-xs text-muted-foreground">{activeTeam.plan}</span>

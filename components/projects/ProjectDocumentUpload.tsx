@@ -18,7 +18,7 @@ export function ProjectDocumentUpload({ projectId, clientId, defaultType = 'OTHE
     <Button type="button" onClick={() => setOpen(true)} className="min-h-11">Subir documento</Button>
     {open && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="upload-title"><div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl"><h2 id="upload-title" className="text-base font-bold">Subir documento al proyecto</h2><form ref={formRef} action={(data) => startTransition(async () => {
       setError(null); setSuccess(null);
-      const response = await fetch('/api/uploads', { method: 'POST', body: data });
+      const response = await fetch('/api/backend/documents', { method: 'POST', body: data });
       const body = await response.json().catch(() => null);
       if (!response.ok) { setError(body?.error || 'No se pudo subir el documento'); return; }
       setSuccess(`“${body?.document?.originalName || 'El archivo'}” se subió correctamente.`);

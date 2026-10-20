@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { updateTaskStatusAction, updateTaskDetailsAction, createTaskAction } from '@/src/modules/projects/server/actions';
 import { EvidenceModal, TaskEvidenceItem } from '../agile/EvidenceUploader';
 import { Badge } from '@/components/ui/badge';
@@ -8,11 +9,10 @@ import { Button } from '@/components/ui/button';
 import { useHorizontalDragScroll } from '@/hooks/use-horizontal-drag-scroll';
 import type { ProjectRequirement, ProjectSprint, ProjectTask, ProjectWorker } from '@/src/modules/projects/types';
 import { TaskDependencyEditor } from '@/components/projects/TaskDependencyEditor';
-import { formatCompactDate } from '@/lib/formatters';
+import { formatCompactDate, formatProjectPriority, formatTaskStatus } from '@/lib/formatters';
 import {
   Camera,
   Calendar,
-  MoreVertical,
   Plus,
   Filter,
   Layers,
@@ -32,35 +32,35 @@ const COLUMNS: Array<{
 }> = [
   {
     id: 'TODO',
-    title: 'New',
+    title: 'Por hacer',
     dotColor: 'bg-indigo-600',
     columnBg: 'bg-[#F6F7FB] border-slate-200/70',
     headerColor: 'text-slate-700',
   },
   {
     id: 'IN_PROGRESS',
-    title: 'In Progress',
+    title: 'En progreso',
     dotColor: 'bg-blue-600',
     columnBg: 'bg-[#F0F6FF] border-blue-100/70',
     headerColor: 'text-slate-700',
   },
   {
     id: 'REVIEW',
-    title: 'Pending / Review',
+    title: 'En revisión',
     dotColor: 'bg-amber-500',
     columnBg: 'bg-[#FFF9F2] border-amber-100/70',
     headerColor: 'text-slate-700',
   },
   {
     id: 'BLOCKED',
-    title: 'Blocked',
+    title: 'Bloqueada',
     dotColor: 'bg-rose-500',
     columnBg: 'bg-[#FFF2F4] border-rose-100/70',
     headerColor: 'text-slate-700',
   },
   {
     id: 'DONE',
-    title: 'Completed',
+    title: 'Terminada',
     dotColor: 'bg-emerald-500',
     columnBg: 'bg-[#F2FAF5] border-emerald-100/70',
     headerColor: 'text-slate-700',
@@ -81,6 +81,12 @@ export function TaskKanban({
   workers?: ProjectWorker[];
 }) {
   const [tasks, setTasks] = useState<TaskItem[]>(initialTasks);
+  const [syncedTasks, setSyncedTasks] = useState(initialTasks);
+  if (syncedTasks !== initialTasks) {
+    setSyncedTasks(initialTasks);
+    setTasks(initialTasks);
+  }
+  const focusedTaskId = useSearchParams().get('task');
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -104,6 +110,14 @@ export function TaskKanban({
   const [newTaskWorkerId, setNewTaskWorkerId] = useState('');
   const [newTaskStartDate, setNewTaskStartDate] = useState('');
   const [newTaskEndDate, setNewTaskEndDate] = useState('');
+
+  useEffect(() => {
+    if (!focusedTaskId) return;
+    const card = document.getElementById(`task-${focusedTaskId}`);
+    if (!card) return;
+    card.scrollIntoView({ block: 'center', inline: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    card.focus({ preventScroll: true });
+  }, [focusedTaskId]);
 
   // Drag handlers
   const handleDragStart = (e: React.DragEvent, id: string) => {
@@ -181,7 +195,6 @@ export function TaskKanban({
       await createTaskAction(projectId, formData);
       setNewTaskTitle('');
       setNewTaskOpen(false);
-      window.location.reload();
     });
   };
 
@@ -198,42 +211,27 @@ export function TaskKanban({
       case 'URGENT':
         return (
           <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-100">
-            Urgent
+            {formatProjectPriority('URGENT')}
           </span>
         );
       case 'HIGH':
         return (
           <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100">
-            High
+            {formatProjectPriority('HIGH')}
           </span>
         );
       case 'LOW':
         return (
           <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-sky-50 text-sky-600 border border-sky-100">
-            Low
+            {formatProjectPriority('LOW')}
           </span>
         );
       default:
         return (
           <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-100">
-            Medium
+            {formatProjectPriority('MEDIUM')}
           </span>
         );
-    }
-  };
-
-  const getTaskProgressPercent = (status: TaskItem['status']) => {
-    switch (status) {
-      case 'DONE':
-        return 100;
-      case 'REVIEW':
-        return 80;
-      case 'IN_PROGRESS':
-        return 50;
-      case 'BLOCKED':
-        return 30;
-      default:
-        return 10;
     }
   };
 
@@ -359,17 +357,19 @@ export function TaskKanban({
                   </div>
                 ) : (
                   colTasks.map((task) => {
-                    const progress = getTaskProgressPercent(task.status);
                     const hasUnresolvedDependencies = Boolean(task.blockedBy?.some((dependency) => dependency.predecessor.status !== 'DONE'));
 
                     return (
                       <div
                         key={task.id}
+                        id={`task-${task.id}`}
+                        tabIndex={-1}
+                        aria-current={focusedTaskId === task.id ? 'true' : undefined}
                         draggable
                         onDragStart={(e) => handleDragStart(e, task.id)}
                         className={`group relative rounded-xl bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-md transition-all cursor-grab active:cursor-grabbing border border-slate-100 space-y-3 ${
                           draggedTaskId === task.id ? 'opacity-40 scale-95' : ''
-                        }`}
+                        } ${focusedTaskId === task.id ? 'ring-2 ring-blue-600 ring-offset-2' : ''} focus-visible:outline-none`}
                       >
                         {/* Top row: Priority Pill, 6-dots handle & Optional Req Tag + Menu */}
                         <div className="flex items-center justify-between">
@@ -385,13 +385,6 @@ export function TaskKanban({
                               </span>
                             )}
                           </div>
-
-                          <button
-                            type="button"
-                            className="text-slate-300 group-hover:text-slate-500 hover:bg-slate-100 p-1 rounded-md transition-colors"
-                          >
-                            <MoreVertical className="size-3.5" />
-                          </button>
                         </div>
 
                         <label className="block text-[11px] font-medium text-slate-500">Mover a
@@ -427,63 +420,49 @@ export function TaskKanban({
                           {task.title}
                         </h4>
 
-                        {/* Progress Bar & Evidence Indicator */}
-                        <div className="space-y-1.5 pt-0.5">
-                          <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
-                            <span className="text-slate-400 font-normal">Progress</span>
-                            <div className="flex items-center gap-2">
-                              {/* Evidence icon button */}
-                              <button
-                                type="button"
-                                onClick={() => setEvidenceModalTask(task)}
-                                className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md transition-colors ${
-                                  task.evidences && task.evidences.length > 0
-                                    ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 font-semibold'
-                                    : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
-                                }`}
-                                title="Subir / Ver capturas de evidencia"
-                              >
-                                <Camera className="size-3" />
-                                <span>{task.evidences?.length || 0}</span>
-                              </button>
-                              <span className="font-semibold text-slate-700">{progress}%</span>
-                            </div>
-                          </div>
-
-                          {/* Progress Track */}
-                          <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full transition-all duration-300 ${
-                                task.status === 'DONE'
-                                  ? 'bg-emerald-500'
-                                  : task.status === 'BLOCKED'
-                                  ? 'bg-rose-500'
-                                  : 'bg-indigo-600'
+                        {/* Bottom Row: Due date, evidence & assignee */}
+                        <div className="pt-2 border-t border-slate-100/80 flex items-center justify-between gap-2 text-xs text-slate-400">
+                          <div className="flex items-center gap-2 min-w-0">
+                            {(() => {
+                              const due = task.dueDate || task.plannedEndDate;
+                              if (!due) return null;
+                              const overdue = task.status !== 'DONE' && new Date(due).getTime() < new Date().setHours(0, 0, 0, 0);
+                              return (
+                                <span className={`inline-flex items-center gap-1 text-[11px] ${overdue ? 'font-semibold text-rose-700' : 'text-slate-500'}`}>
+                                  <Calendar className="size-3.5" aria-hidden="true" />
+                                  {overdue ? 'Venció ' : 'Vence '}{formatCompactDate(due)}
+                                </span>
+                              );
+                            })()}
+                            <button
+                              type="button"
+                              onClick={() => setEvidenceModalTask(task)}
+                              className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md transition-colors ${
+                                task.evidences && task.evidences.length > 0
+                                  ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 font-semibold'
+                                  : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
                               }`}
-                              style={{ width: `${progress}%` }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Bottom Row: Date & Stacked Assignee Avatars */}
-                        <div className="pt-2 border-t border-slate-100/80 flex items-center justify-between text-xs text-slate-400">
-                          <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                            <Calendar className="size-3.5 text-slate-400" />
-                            <span>
-                              {task.dueDate
-                                ? formatCompactDate(task.dueDate)
-                                : 'Feb 28'}
-                            </span>
+                              aria-label={`Evidencias de ${task.title}: ${task.evidences?.length || 0}`}
+                              title="Subir o ver capturas de evidencia"
+                            >
+                              <Camera className="size-3" aria-hidden="true" />
+                              <span>{task.evidences?.length || 0}</span>
+                            </button>
                           </div>
 
                           {/* Avatar Circle */}
                           <div className="flex items-center -space-x-1.5 overflow-hidden">
-                            <div
-                              className="w-6 h-6 rounded-full bg-gradient-to-tr from-amber-400 to-orange-500 border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-xs"
-                              title={task.assignedTo?.name || 'Responsable'}
-                            >
-                              {getInitials(task.assignedTo?.name)}
-                            </div>
+                            {task.assignedTo ? (
+                              <div
+                                className="w-6 h-6 rounded-full bg-slate-700 border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-xs"
+                                title={task.assignedTo.name}
+                                aria-label={`Responsable: ${task.assignedTo.name}`}
+                              >
+                                {getInitials(task.assignedTo.name)}
+                              </div>
+                            ) : (
+                              <span className="text-[11px] text-slate-400">Sin responsable</span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -503,7 +482,7 @@ export function TaskKanban({
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
                 <Plus className="size-4 text-blue-600" />
-                Nueva Tarea ({newTaskStatus})
+                Nueva tarea · {formatTaskStatus(newTaskStatus)}
               </h3>
               <button
                 type="button"
@@ -556,10 +535,10 @@ export function TaskKanban({
                     onChange={(e) => setNewTaskPriority(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-1.5 text-xs outline-none focus:bg-white focus:ring-2 focus:ring-blue-600"
                   >
-                    <option value="LOW">Low</option>
-                    <option value="MEDIUM">Medium</option>
-                    <option value="HIGH">High</option>
-                    <option value="URGENT">Urgent</option>
+                    <option value="LOW">Baja</option>
+                    <option value="MEDIUM">Media</option>
+                    <option value="HIGH">Alta</option>
+                    <option value="URGENT">Urgente</option>
                   </select>
                 </div>
               </div>
@@ -624,7 +603,7 @@ export function TaskKanban({
                   size="sm"
                   className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white"
                 >
-                  {isPending ? 'Creando...' : 'Crear Tarea'}
+                  {isPending ? 'Creando…' : 'Crear tarea'}
                 </Button>
               </div>
             </form>

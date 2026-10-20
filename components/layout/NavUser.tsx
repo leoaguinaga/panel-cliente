@@ -93,15 +93,6 @@ export function NavUser({
             align="end"
             sideOffset={4}
           >
-            {user?.role && (
-              <>
-                {/* <DropdownMenuSeparator /> */}
-                <div className="px-2 py-1 text-xs text-muted-foreground">
-                  Rol: <span className="font-medium text-foreground lowercase">{user.role}</span>
-                </div>
-              </>
-            )}
-            <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem
                 onClick={() => router.push("/internal/profile")}
