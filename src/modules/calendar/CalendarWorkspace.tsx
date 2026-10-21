@@ -9,6 +9,16 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { Connection, Entry, Event, Options, Results } from "./types";
 import { CalendarGridLoading } from "./CalendarLoading";
 import styles from "./calendar.module.css";
@@ -88,6 +98,7 @@ export function CalendarWorkspace() {
   const [lateOffset, setLateOffset] = useState<number | null>(null);
   const [showLate, setShowLate] = useState(false);
   const [detail, setDetail] = useState<Event>();
+  const [cancelOpen, setCancelOpen] = useState(false);
   const { form, setForm, exiting, content, dayContent } = usePanelMotion<{
     kind: "meeting" | "reminder";
     entry?: Entry;
@@ -963,35 +974,59 @@ export function CalendarWorkspace() {
                       <Button
                         variant="destructive"
                         disabled={busy}
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              detail.entry!.kind === "meeting"
-                                ? "¿Cancelar la reunión? Se notificará a los invitados si las invitaciones están activadas."
-                                : "¿Cancelar este recordatorio?",
-                            )
-                          )
-                            void mutate(async () => {
-                              const result = await api<Entry>(
-                                "entries/" + detail.entry!.id,
-                                {
-                                  method: "PATCH",
-                                  body: JSON.stringify({
-                                    ...payload(detail.entry!),
-                                    status: "CANCELLED",
-                                  }),
-                                },
-                              );
-                              if (result.syncError)
-                                return "Cancelación guardada; falta actualizar Google. Abre el pendiente para reintentar.";
-                            }, "Pendiente cancelado.");
-                        }}
+                        onClick={() => setCancelOpen(true)}
                       >
                         Cancelar{" "}
                         {detail.entry.kind === "meeting"
                           ? "reunión"
                           : "recordatorio"}
                       </Button>
+                      <AlertDialog
+                        open={cancelOpen}
+                        onOpenChange={setCancelOpen}
+                      >
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>
+                              {detail.entry.kind === "meeting"
+                                ? "¿Cancelar la reunión?"
+                                : "¿Cancelar este recordatorio?"}
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              {detail.entry.kind === "meeting"
+                                ? "Se notificará a los invitados si las invitaciones están activadas."
+                                : "El recordatorio dejará de aparecer en el calendario."}
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Volver</AlertDialogCancel>
+                            <AlertDialogAction
+                              variant="destructive"
+                              onClick={() =>
+                                void mutate(async () => {
+                                  const result = await api<Entry>(
+                                    "entries/" + detail.entry!.id,
+                                    {
+                                      method: "PATCH",
+                                      body: JSON.stringify({
+                                        ...payload(detail.entry!),
+                                        status: "CANCELLED",
+                                      }),
+                                    },
+                                  );
+                                  if (result.syncError)
+                                    return "Cancelación guardada; falta actualizar Google. Abre el pendiente para reintentar.";
+                                }, "Pendiente cancelado.")
+                              }
+                            >
+                              Sí, cancelar{" "}
+                              {detail.entry.kind === "meeting"
+                                ? "reunión"
+                                : "recordatorio"}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   )}
                 </>
