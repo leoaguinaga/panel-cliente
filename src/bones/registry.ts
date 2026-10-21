@@ -3,14 +3,18 @@
 import { registerBones } from 'boneyard-js'
 import { configureBoneyard } from 'boneyard-js/react'
 
-import _project_summary from './project-summary.bones.json'
+import _support_center from './support-center.bones.json'
+import _calendar_grid from './calendar-grid.bones.json'
 import _client_portal from './client-portal.bones.json'
 import _product_demos from './product-demos.bones.json'
+import _project_summary from './project-summary.bones.json'
 
-configureBoneyard({"color":"#e5e7eb","darkColor":"#2a2a2a","animate":"shimmer","shimmerColor":"#f3f4f6","darkShimmerColor":"#333333","speed":"2s","transition":200})
+configureBoneyard({"color":"#2a2a2e","darkColor":"#2a2a2e","animate":"shimmer","shimmerColor":"#333338","darkShimmerColor":"#333338","speed":"2s","transition":200})
 
 registerBones({
-  "project-summary": _project_summary,
+  "support-center": _support_center,
+  "calendar-grid": _calendar_grid,
   "client-portal": _client_portal,
   "product-demos": _product_demos,
+  "project-summary": _project_summary,
 })

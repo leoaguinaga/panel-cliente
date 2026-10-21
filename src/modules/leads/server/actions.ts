@@ -16,6 +16,8 @@ const payload = (formData: FormData) => ({
   previewUrl: String(formData.get('previewUrl') || '').trim() || null,
   message: String(formData.get('message') || '').trim() || null,
   assignedToId: String(formData.get('assignedToId') || '').trim() || null,
+  // Solo si el formulario trae el campo: vacío = FoxCode; ausente = no tocar el espacio.
+  ...(formData.has('productId') ? { productId: String(formData.get('productId') || '').trim() || null } : {}),
 });
 
 const refresh = (id?: string) => {
@@ -46,18 +48,47 @@ export async function updateLeadAction(id: string, formData: FormData) {
   return res;
 }
 
-export async function changeLeadStatusAction(id: string, status: string) {
-  const res = await backendFetch<Lead>(`/leads/${id}/status`, {
+/** Campos que el panel del lead guarda uno a uno, sin pasar por el formulario completo. */
+export type LeadPatch = Partial<{
+  name: string;
+  companyName: string | null;
+  email: string | null;
+  phone: string | null;
+  zone: string | null;
+  type: string;
+  previewUrl: string | null;
+  message: string | null;
+  priority: string;
+  assignedToId: string | null;
+  productId: string | null;
+  nextActionAt: string | null;
+  nextActionNote: string | null;
+  lastContactAt: string | null;
+}>;
+
+export async function patchLeadAction(id: string, patch: LeadPatch) {
+  const res = await backendFetch<Lead>(`/leads/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify(patch),
   });
   refresh(id);
   return res;
 }
 
-export async function markLeadAsLostAction(id: string) {
-  await changeLeadStatusAction(id, 'LOST');
+export async function changeLeadStatusAction(id: string, status: string, lostReason?: string | null) {
+  const res = await backendFetch<Lead>(`/leads/${id}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status, ...(lostReason !== undefined ? { lostReason } : {}) }),
+  });
+  refresh(id);
+  return res;
+}
+
+export async function markLeadAsLostAction(id: string, formData?: FormData) {
+  const reason = String(formData?.get('lostReason') || '').trim();
+  await changeLeadStatusAction(id, 'LOST', reason || null);
 }
 
 export async function convertLeadToProjectAction(leadId: string, projectName?: string, price?: number, responsibleWorkerId?: string | null, projectType?: string) {
@@ -70,3 +101,14 @@ export async function convertLeadToProjectAction(leadId: string, projectName?: s
   return res;
 }
 
+
+export async function setLeadNextActionAction(id: string, formData: FormData) {
+  const date = String(formData.get('nextActionAt') || '').trim();
+  await backendFetch<Lead>(`/leads/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    // Mediodía de Lima: el día no se corre al convertir a UTC (igual que en demos).
+    body: JSON.stringify({ nextActionAt: date ? `${date}T12:00:00-05:00` : null }),
+  });
+  refresh(id);
+}

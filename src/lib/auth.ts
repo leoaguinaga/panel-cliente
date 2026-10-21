@@ -1,6 +1,8 @@
+import { cache } from 'react';
 import { ROLES, Role } from '../modules/auth/server/permissions';
 import { BackendApiError, backendFetch } from './api/server';
-export async function getSession() {
+// cache() dedupes the call per request: layout + page share one backend hit.
+export const getSession = cache(async () => {
   try {
     return await backendFetch<{
       user: {
@@ -10,6 +12,7 @@ export async function getSession() {
         name?: string;
         email?: string;
         image?: string | null;
+        jobTitle?: string | null;
         clientId?: string | null;
       };
     }>('/auth/session');
@@ -17,7 +20,7 @@ export async function getSession() {
     if (error instanceof BackendApiError && (error.status === 401 || error.status === 403)) return null;
     throw error;
   }
-}
+});
 
 // Helper to validate role on the server
 import { redirect } from "next/navigation";

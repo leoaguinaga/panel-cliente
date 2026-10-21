@@ -7,6 +7,7 @@ export const projectStatus: Record<string, string> = {
 };
 
 export const paymentStatus: Record<string, string> = {
+  SCHEDULED: 'Programado',
   PENDING: 'Pendiente',
   UNDER_REVIEW: 'En revisión',
   PARTIAL: 'Pago parcial',
@@ -16,6 +17,7 @@ export const paymentStatus: Record<string, string> = {
 };
 
 export const paymentStatusStyles: Record<string, string> = {
+  SCHEDULED: 'bg-slate-50 text-slate-500 border-slate-200',
   PENDING: 'bg-slate-100 text-slate-700 border-slate-200',
   UNDER_REVIEW: 'bg-amber-50 text-amber-800 border-amber-200 ring-1 ring-amber-500/30',
   PARTIAL: 'bg-blue-50 text-blue-800 border-blue-200',
@@ -54,6 +56,8 @@ export const formatBytes = (value: number) =>
 export const milestoneStatus: Record<string, string> = {
   PENDING: 'Pendiente',
   IN_PROGRESS: 'En curso',
+  IN_REVIEW: 'Listo para revisar',
+  APPROVED: 'Aprobado',
   COMPLETED: 'Completado',
   BLOCKED: 'En espera',
 };

@@ -1,3 +1,10 @@
-import { Mail, MessageCircle, ShieldCheck } from 'lucide-react';
-import { ClientPageHeader } from '@/components/client/ClientPageHeader';
-export default function ClientHelpPage() { return <><ClientPageHeader title="Ayuda" description="Encuentra el canal adecuado para resolver dudas sobre tu proyecto o tu cuenta." /><div className="grid gap-5 md:grid-cols-2"><section className="rounded-2xl border border-slate-200 bg-white p-6"><MessageCircle className="text-orange-500" size={24} /><h2 className="mt-5 text-lg font-semibold text-slate-950">Consulta sobre tu proyecto</h2><p className="mt-2 text-sm leading-6 text-slate-600">Escríbenos indicando el nombre del proyecto y el detalle de tu consulta.</p><a href="mailto:soporte@foxcode.pe?subject=Consulta%20desde%20el%20portal" className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-slate-950 hover:text-orange-600"><Mail size={17} />soporte@foxcode.pe</a></section><section className="rounded-2xl border border-slate-200 bg-white p-6"><ShieldCheck className="text-emerald-600" size={24} /><h2 className="mt-5 text-lg font-semibold text-slate-950">Acceso y seguridad</h2><p className="mt-2 text-sm leading-6 text-slate-600">Si no reconoces una actividad o tienes problemas para ingresar, contacta a soporte. Nunca compartas tu contraseña.</p></section></div></> }
+import { backendFetch } from '@/src/lib/api/server';
+import { requireAuth } from '@/src/lib/auth';
+import { getPortalSettings } from '@/src/modules/settings/server/queries';
+import { HelpCenter } from '@/src/modules/support/HelpCenter';
+import type { GuideVote, ProjectOption, TicketList } from '@/src/modules/support/types';
+export default async function ClientHelpPage() {
+  await requireAuth(['CLIENT']);
+  const [settings,tickets,projects,votes]=await Promise.all([getPortalSettings(),backendFetch<TicketList>('/support'),backendFetch<ProjectOption[]>('/support/projects'),backendFetch<GuideVote[]>('/support/feedback')]);
+  return <HelpCenter tickets={tickets} projects={projects} votes={votes} email={settings.contact_email||''} whatsapp={settings.official_whatsapp||''} company={settings.company_name||'FoxCode'}/>;
+}

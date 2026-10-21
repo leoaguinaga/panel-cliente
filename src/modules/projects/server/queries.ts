@@ -1,7 +1,9 @@
 import type { Project } from '@/src/lib/api/contracts';
 import { allPages, type Page } from '@/src/lib/api/pagination';
 import { backendFetch } from '@/src/lib/api/server';
-import type { ProjectDocumentationSection, ProjectPlanningSection, ProjectSummary, ProjectTasksSection } from '../types';
+import { BackendApiError } from '@/src/lib/api/server';
+import type { ProjectSite } from '@/src/modules/dashboard/server/queries';
+import type { ProjectDocumentationSection, ProjectPlanningSection, ProjectSummary, ProjectTasksSection, TaskDetail } from '../types';
 
 export async function getProjectsOverview(filters?: { search?: string; status?: string }) {
   const query = new URLSearchParams();
@@ -15,13 +17,27 @@ export async function getProjectById(id: string) {
 }
 
 export const getProjectSummary = (id: string) => backendFetch<ProjectSummary>(`/projects/${id}/summary`);
+export const getProjectSite = (id: string) => backendFetch<{ site: ProjectSite | null }>(`/projects/${id}/site`).then((r) => r.site);
 export const getProjectTasks = (id: string) => backendFetch<ProjectTasksSection>(`/projects/${id}/tasks-section`);
+export async function getTaskDetail(projectId: string, taskId: string) {
+  try {
+    return await backendFetch<TaskDetail>(`/projects/${projectId}/tasks/${encodeURIComponent(taskId)}`);
+  } catch (error) {
+    if (error instanceof BackendApiError && error.status === 404) return null;
+    throw error;
+  }
+}
 export const getProjectPlanning = (id: string) => backendFetch<ProjectPlanningSection>(`/projects/${id}/planning-section`);
 export const getProjectDocumentation = (id: string) => backendFetch<ProjectDocumentationSection>(`/projects/${id}/documentation-section`);
 
 type ListQuery = Record<string, string | undefined>;
 export type FacetCounts = Record<string, number>;
-export type ProjectListItem = Project & { taskStats: { open: number; blocked: number; overdue: number } };
+export type ProjectListMilestone = { id: string; title: string; status: string; dueDate: string | null; tasks: { done: number; total: number } };
+export type ProjectListItem = Omit<Project, 'product'> & {
+  product: { id: string; name: string; color: string | null; logoUrl: string | null } | null;
+  milestones: ProjectListMilestone[];
+  taskStats: { open: number; blocked: number; overdue: number };
+};
 export type ProjectFacets = { views: Record<'active' | 'paused' | 'delivered' | 'all', number>; status: FacetCounts; worker: FacetCounts; product: FacetCounts; service: FacetCounts };
 export type TaskFacets = { views: Record<'mine' | 'team' | 'overdue' | 'blocked', number>; status: FacetCounts; worker: FacetCounts; project: FacetCounts };
 

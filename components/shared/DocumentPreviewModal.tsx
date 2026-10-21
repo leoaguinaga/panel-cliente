@@ -114,7 +114,7 @@ export function DocumentPreviewModal({
   );
   const fileExtension = getFileExtension(document.originalName);
   const downloadUrl = document.url || `/api/backend/documents/${document.id}/download`;
-  const inlineUrl = `${downloadUrl}?inline=1`;
+  const inlineUrl = `${downloadUrl}${downloadUrl.includes('?') ? '&' : '?'}inline=1`;
 
   const renderIcon = () => {
     switch (previewType) {
@@ -148,10 +148,10 @@ export function DocumentPreviewModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="document-preview-title"
-      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/80 p-2 sm:p-4 backdrop-blur-xs animate-in fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/80 p-2 sm:p-4 backdrop-blur-xs animate-in fade-in"
     >
       <div
-        className={`relative flex flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-2xl transition-all ${
+        className={`relative flex flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-card shadow-2xl transition-all ${
           isFullScreen
             ? 'h-[98vh] w-[98vw]'
             : 'max-h-[92vh] w-full max-w-5xl'
@@ -160,7 +160,7 @@ export function DocumentPreviewModal({
         {/* Header Bar */}
         <header className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-5 py-3.5">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-2xs">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-card shadow-2xs">
               {renderIcon()}
             </div>
             <div className="min-w-0">
@@ -183,7 +183,7 @@ export function DocumentPreviewModal({
           <div className="flex items-center gap-1.5">
             {/* DOCX Controls */}
             {previewType === 'docx' && !docxLoading && !docxError && (
-              <div className="hidden items-center gap-1 rounded-xl border border-slate-200 bg-white px-2 py-1 sm:flex">
+              <div className="hidden items-center gap-1 rounded-xl border border-slate-200 bg-card px-2 py-1 sm:flex">
                 <button
                   type="button"
                   onClick={() => setDocxZoom((z) => Math.max(70, z - 15))}
@@ -208,7 +208,7 @@ export function DocumentPreviewModal({
 
             {/* Image Controls */}
             {previewType === 'image' && (
-              <div className="hidden items-center gap-1 rounded-xl border border-slate-200 bg-white px-2 py-1 sm:flex">
+              <div className="hidden items-center gap-1 rounded-xl border border-slate-200 bg-card px-2 py-1 sm:flex">
                 <button
                   type="button"
                   onClick={() => setImageZoom((z) => Math.max(0.5, z - 0.25))}
@@ -248,19 +248,19 @@ export function DocumentPreviewModal({
             <button
               type="button"
               onClick={() => setIsFullScreen((f) => !f)}
-              className="hidden rounded-xl border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-100 sm:flex"
+              className="hidden rounded-xl border border-slate-200 bg-card p-2 text-slate-600 hover:bg-slate-100 sm:flex"
               title={isFullScreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
             >
               {isFullScreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
             </button>
 
-            {/* Open in new tab (if previewable) */}
-            {previewType !== 'unsupported' && (
+            {/* Abrir en pestaña: solo lo que el navegador muestra por sí mismo (un .docx se descargaría) */}
+            {(previewType === 'pdf' || previewType === 'image') && (
               <a
                 href={inlineUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="hidden rounded-xl border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-100 sm:flex"
+                className="hidden rounded-xl border border-slate-200 bg-card p-2 text-slate-600 hover:bg-slate-100 sm:flex"
                 title="Abrir en pestaña nueva"
               >
                 <ExternalLink size={16} />
@@ -308,7 +308,7 @@ export function DocumentPreviewModal({
                   </p>
                 </div>
               ) : docxError ? (
-                <div className="mx-auto max-w-md rounded-2xl border border-red-200 bg-white p-8 text-center shadow-xs">
+                <div className="mx-auto max-w-md rounded-2xl border border-red-200 bg-card p-8 text-center shadow-xs">
                   <FileText size={48} className="mx-auto text-red-500" />
                   <h3 className="mt-3 text-base font-bold text-slate-900">
                     No fue posible previsualizar este documento Word
@@ -317,7 +317,7 @@ export function DocumentPreviewModal({
                   <a
                     href={downloadUrl}
                     download={document.originalName}
-                    className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-semibold text-white hover:bg-slate-800"
+                    className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-brand-button px-5 py-2.5 text-xs font-semibold text-white hover:bg-brand-hover"
                   >
                     <Download size={15} />
                     <span>Descargar archivo original</span>
@@ -332,7 +332,7 @@ export function DocumentPreviewModal({
                     transformOrigin: 'top center',
                   }}
                 >
-                  <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-md sm:p-14">
+                  <div className="rounded-2xl border border-slate-200 bg-card p-8 shadow-md sm:p-14">
                     <div className="border-b border-slate-100 pb-4 mb-6 flex items-center justify-between text-xs text-slate-400">
                       <span className="font-semibold text-blue-700 flex items-center gap-1">
                         <FileText size={14} /> Documento Word
@@ -370,11 +370,11 @@ export function DocumentPreviewModal({
           {/* 3. PDF PREVIEW                                    */}
           {/* ================================================= */}
           {previewType === 'pdf' && (
-            <div className="h-[75vh] w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-900 shadow-inner">
+            <div className="h-[75vh] w-full overflow-hidden rounded-2xl border border-slate-200 bg-black/40 shadow-inner">
               <iframe
                 src={inlineUrl}
                 title={document.originalName}
-                className="h-full w-full rounded-2xl border-0 bg-white"
+                className="h-full w-full rounded-2xl border-0 bg-card"
               />
             </div>
           )}
@@ -383,7 +383,7 @@ export function DocumentPreviewModal({
           {/* 4. UNSUPPORTED / DOWNLOAD FALLBACK (SOLO ESOS)    */}
           {/* ================================================= */}
           {previewType === 'unsupported' && (
-            <div className="mx-auto my-8 max-w-lg rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-lg sm:p-12">
+            <div className="mx-auto my-8 max-w-lg rounded-3xl border border-slate-200 bg-card p-8 text-center shadow-lg sm:p-12">
               <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-slate-100 text-slate-600 ring-8 ring-slate-50">
                 {renderIcon()}
               </div>

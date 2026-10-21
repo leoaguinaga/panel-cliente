@@ -80,7 +80,7 @@ export default async function DocumentsPage({
             </option>
           ))}
         </select>
-        <button className="rounded-xl border bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50">
+        <button className="rounded-xl border bg-card px-4 py-2 text-sm font-semibold hover:bg-slate-50">
           Filtrar
         </button>
         <Link

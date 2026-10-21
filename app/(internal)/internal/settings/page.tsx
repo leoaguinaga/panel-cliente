@@ -1,6 +1,13 @@
+import { getCatalogs } from '@/src/modules/products/server/queries';
+import { redirect } from 'next/navigation';
 import { requireAuth } from '@/src/lib/auth';
 import { getSettings } from '@/src/modules/settings/server/queries';
-import { saveSettingsAction } from '@/src/modules/settings/server/actions';
+import { SettingsWorkspace } from '@/src/modules/settings/SettingsWorkspace';
 
-const fields = [{ key: 'company_name', label: 'Nombre de empresa', type: 'text' }, { key: 'contact_email', label: 'Correo de contacto', type: 'email' }, { key: 'official_whatsapp', label: 'WhatsApp oficial', type: 'text' }, { key: 'payment_instructions', label: 'Instrucciones de pago', type: 'textarea' }, { key: 'tax_information', label: 'Información fiscal', type: 'textarea' }, { key: 'task_wip_limit', label: 'Tareas en curso por persona (límite WIP del tablero)', type: 'number' }];
-export default async function SettingsPage() { await requireAuth(['ADMIN']); const settings = await getSettings(); const values = Object.fromEntries(settings.map((item) => [item.key, item.value])); return <section className="mx-auto max-w-3xl space-y-6"><div><p className="text-sm text-muted-foreground">Administración</p><h1 className="text-3xl font-semibold tracking-tight">Configuración interna</h1><p className="mt-1 text-sm text-muted-foreground">Datos de Foxcode y contenido controlado para el portal de cliente.</p></div><form action={saveSettingsAction} className="space-y-5 rounded-xl border bg-card p-6">{fields.map((field) => <label key={field.key} className="block space-y-2 text-sm font-medium">{field.label}{field.type === 'textarea' ? <textarea name={field.key} defaultValue={values[field.key] || ''} rows={4} className="w-full rounded border bg-background px-3 py-2 font-normal" /> : <input name={field.key} type={field.type} defaultValue={values[field.key] || (field.key === 'task_wip_limit' ? '2' : '')} {...(field.type === 'number' ? { min: 1, max: 20, step: 1, required: true } : {})} className="w-full rounded border bg-background px-3 py-2 font-normal" />}</label>)}<button className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-brand-hover">Guardar configuración</button></form></section>; }
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ section?: string }> }) {
+  const { user } = await requireAuth(['ADMIN', 'WORKER']);
+  // Las preferencias personales viven en Mi perfil; Configuración es solo de la empresa.
+  if (user.role !== 'ADMIN' || (await searchParams).section === 'preferencias') redirect('/internal/profile#preferencias');
+  const [settings, { services }] = await Promise.all([getSettings(), getCatalogs()]);
+  return <SettingsWorkspace services={services} initialValues={Object.fromEntries(settings.map(item => [item.key, item.value]))} />;
+}

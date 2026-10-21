@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { ProjectMilestone, ProjectSprint, ProjectTask } from '@/src/modules/projects/types';
+import { isMilestoneDone, type ProjectMilestone, type ProjectSprint, type ProjectTask } from '@/src/modules/projects/types';
 
 const DAY = 86_400_000;
 const LABEL_WIDTH = 240;
@@ -76,21 +76,21 @@ export function ProjectGantt({ tasks, sprints, milestones }: { tasks: ProjectTas
   useEffect(() => { scrollToToday(); }, [scale]); // eslint-disable-line react-hooks/exhaustive-deps
   const toggle = (id: string) => setCollapsed((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
 
-  const select = 'min-h-10 rounded-xl border bg-white px-3 text-xs';
+  const select = 'min-h-10 rounded-xl border bg-card px-3 text-xs';
   return <section aria-labelledby="gantt-title" className="space-y-4">
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div><h2 id="gantt-title" className="text-base font-bold text-slate-900">Gantt del proyecto</h2>
         <p className="mt-1 text-sm text-slate-500">{scheduledTasks.length} tareas programadas{overdue > 0 && <span className="font-medium text-rose-600"> · {overdue} atrasada{overdue === 1 ? '' : 's'}</span>}</p></div>
       <div className="flex flex-wrap gap-2">
-        <select aria-label="Filtrar por sprint" value={sprintId} onChange={(e) => setSprintId(e.target.value)} className={select}><option value="ALL">Todos los sprints</option>{sprints.map((sprint) => <option key={sprint.id} value={sprint.id}>{sprint.name}</option>)}</select>
+        {sprints.length > 0 && <select aria-label="Filtrar por sprint" value={sprintId} onChange={(e) => setSprintId(e.target.value)} className={select}><option value="ALL">Todos los sprints</option>{sprints.map((sprint) => <option key={sprint.id} value={sprint.id}>{sprint.name}</option>)}</select>}
         <select aria-label="Filtrar por responsable" value={workerId} onChange={(e) => setWorkerId(e.target.value)} className={select}><option value="ALL">Todos los responsables</option>{workers.map((worker) => <option key={worker.id} value={worker.id}>{worker.name}</option>)}</select>
         <select aria-label="Filtrar por estado" value={status} onChange={(e) => setStatus(e.target.value)} className={select}><option value="ALL">Todos los estados</option>{Object.entries(TASK_STATUS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-        <button type="button" onClick={scrollToToday} disabled={!todayVisible} className="min-h-10 rounded-xl border bg-white px-3 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40">Ir a hoy</button>
-        <div className="flex rounded-xl border bg-white p-1" role="group" aria-label="Escala del Gantt">{(['day', 'week', 'month'] as Scale[]).map((value) => <button key={value} type="button" onClick={() => setScale(value)} aria-pressed={scale === value} className={`min-h-8 rounded-lg px-3 text-xs font-medium ${scale === value ? 'bg-slate-900 text-white' : 'text-slate-500 hover:text-slate-900'}`}>{value === 'day' ? 'Día' : value === 'week' ? 'Semana' : 'Mes'}</button>)}</div>
+        <button type="button" onClick={scrollToToday} disabled={!todayVisible} className="min-h-10 rounded-xl border bg-card px-3 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40">Ir a hoy</button>
+        <div className="flex rounded-xl border bg-card p-1" role="group" aria-label="Escala del Gantt">{(['day', 'week', 'month'] as Scale[]).map((value) => <button key={value} type="button" onClick={() => setScale(value)} aria-pressed={scale === value} className={`min-h-8 rounded-lg px-3 text-xs font-medium ${scale === value ? 'bg-brand-button text-white' : 'text-slate-500 hover:text-slate-900'}`}>{value === 'day' ? 'Día' : value === 'week' ? 'Semana' : 'Mes'}</button>)}</div>
       </div>
     </div>
 
-    <div className="rounded-2xl border bg-white">
+    <div className="rounded-2xl border bg-card">
       {rows.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">No hay elementos programados con los filtros actuales.</p> :
       <div ref={scroller} className="max-h-[70vh] overflow-auto rounded-2xl">
         <div className="relative" style={{ width: LABEL_WIDTH + timelineWidth }}>
@@ -121,14 +121,14 @@ export function ProjectGantt({ tasks, sprints, milestones }: { tasks: ProjectTas
               : `${label}${start && end ? ` · ${shortDate(start)}${start !== end ? ` – ${shortDate(end)}` : ''}` : ''}`;
             const geometry = start && end ? bar(start, end) : null;
             return <li key={`${row.kind}-${row.item.id}`} className={`flex border-b last:border-b-0 ${row.kind === 'sprint' ? 'bg-indigo-50/40' : ''}`}>
-              <div className={`sticky left-0 z-10 shrink-0 border-r px-3 py-2 text-xs ${row.kind === 'sprint' ? 'bg-indigo-50 font-semibold text-slate-800' : 'bg-white'} ${row.kind === 'task' ? 'pl-8 text-slate-600' : ''}`} style={{ width: LABEL_WIDTH }}>
+              <div className={`sticky left-0 z-10 shrink-0 border-r px-3 py-2 text-xs ${row.kind === 'sprint' ? 'bg-indigo-50 font-semibold text-slate-800' : 'bg-card'} ${row.kind === 'task' ? 'pl-8 text-slate-600' : ''}`} style={{ width: LABEL_WIDTH }}>
                 {row.kind === 'sprint' ? <button type="button" onClick={() => toggle(row.item.id)} aria-expanded={!collapsed.has(row.item.id)} className="flex w-full items-center gap-1.5 text-left"><span aria-hidden="true" className={`inline-block transition-transform ${collapsed.has(row.item.id) ? '' : 'rotate-90'}`}>▸</span><span className="truncate">{label}</span><span className="ml-auto shrink-0 font-normal text-slate-500">{row.done}/{row.total}</span></button>
                   : <p className="truncate" title={label}>{row.kind === 'milestone' ? '◆ ' : ''}{label}</p>}
                 {row.kind === 'task' && <p className="mt-0.5 truncate text-[10px] text-slate-400">{row.item.assignedTo?.name || 'Sin responsable'}{late && <span className="font-medium text-rose-600"> · atrasada</span>}{unresolved.length > 0 && <span className="font-medium text-amber-700"> · {unresolved.length} bloqueo{unresolved.length === 1 ? '' : 's'}</span>}</p>}
               </div>
               <div className="relative min-h-11" style={{ width: timelineWidth }}>
                 {geometry && (row.kind === 'milestone'
-                  ? <span title={title} className={`absolute top-3.5 h-3.5 w-3.5 -translate-x-1/2 rotate-45 rounded-[2px] ring-2 ring-white ${row.item.status === 'COMPLETED' ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ left: geometry.left + dayWidth / 2 }} />
+                  ? <span title={title} className={`absolute top-3.5 h-3.5 w-3.5 -translate-x-1/2 rotate-45 rounded-[2px] ring-2 ring-card ${isMilestoneDone(row.item.status) ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ left: geometry.left + dayWidth / 2 }} />
                   : row.kind === 'sprint'
                     ? <span title={title} className="absolute top-4 h-3 rounded-full bg-indigo-300" style={geometry}><span className="absolute inset-y-0 left-0 rounded-full bg-indigo-600" style={{ width: `${row.total ? (row.done / row.total) * 100 : 0}%` }} /></span>
                     : <span title={title} className={`absolute top-2.5 flex h-6 items-center overflow-hidden rounded-md px-1.5 text-[10px] font-medium text-white ${TASK_BAR[row.item.status] || 'bg-blue-600'} ${late ? 'ring-2 ring-rose-300' : unresolved.length ? 'ring-2 ring-amber-300' : ''}`} style={geometry}>{geometry.width > 70 && <span className="truncate">{label}</span>}</span>)}
@@ -139,12 +139,12 @@ export function ProjectGantt({ tasks, sprints, milestones }: { tasks: ProjectTas
       </div>}
       <ul className="flex flex-wrap gap-x-4 gap-y-2 border-t px-4 py-3 text-[11px] text-slate-500" aria-label="Leyenda">
         {Object.entries(TASK_STATUS).map(([value, label]) => <li key={value} className="flex items-center gap-1.5"><span className={`h-2.5 w-4 rounded-sm ${TASK_BAR[value]}`} />{label}</li>)}
-        <li className="flex items-center gap-1.5"><span className="h-2.5 w-4 rounded-full bg-indigo-300" />Sprint (avance)</li>
+        {sprints.length > 0 && <li className="flex items-center gap-1.5"><span className="h-2.5 w-4 rounded-full bg-indigo-300" />Sprint (avance)</li>}
         <li className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rotate-45 rounded-[2px] bg-amber-500" />Hito</li>
       </ul>
     </div>
 
-    <section aria-labelledby="dependency-flow-title" className="rounded-2xl border bg-white p-4"><div className="flex flex-wrap items-baseline justify-between gap-2"><h3 id="dependency-flow-title" className="text-sm font-semibold text-slate-900">Flujo de dependencias</h3><p className="text-xs text-slate-500">La tarea de la izquierda habilita la tarea de la derecha.</p></div>{dependencies.length === 0 ? <p className="mt-3 text-sm text-slate-500">Todavía no se han definido prerequisitos entre las tareas filtradas.</p> : <ul className="mt-3 grid gap-2 sm:grid-cols-2">{dependencies.map((dependency) => { const ready = dependency.predecessor.status === 'DONE'; return <li key={dependency.id} className="flex min-h-11 items-center gap-2 rounded-xl border px-3 py-2 text-xs"><span className={ready ? 'text-emerald-700' : 'text-amber-700'}>{dependency.predecessor.title}</span><span aria-hidden="true">→</span><span className="font-semibold text-slate-800">{dependency.successor.title}</span><span className={`ml-auto rounded-full px-2 py-1 text-[10px] font-semibold ${ready ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{ready ? 'Habilitada' : 'Bloqueada'}</span></li>; })}</ul>}</section>
-    {unscheduled.length > 0 && <aside className="rounded-2xl border border-dashed bg-slate-50 p-4"><h3 className="text-sm font-semibold text-slate-800">Sin programar ({unscheduled.length})</h3><p className="mt-1 text-xs text-slate-500">Asigna inicio y fin planificados desde la edición de la tarea.</p><ul className="mt-3 grid gap-2 sm:grid-cols-2">{unscheduled.map((task) => <li key={task.id} className="rounded-lg border bg-white px-3 py-2 text-xs text-slate-700">{task.title}</li>)}</ul></aside>}
+    <section aria-labelledby="dependency-flow-title" className="rounded-2xl border bg-card p-4"><div className="flex flex-wrap items-baseline justify-between gap-2"><h3 id="dependency-flow-title" className="text-sm font-semibold text-slate-900">Flujo de dependencias</h3><p className="text-xs text-slate-500">La tarea de la izquierda habilita la tarea de la derecha.</p></div>{dependencies.length === 0 ? <p className="mt-3 text-sm text-slate-500">Todavía no se han definido prerequisitos entre las tareas filtradas.</p> : <ul className="mt-3 grid gap-2 sm:grid-cols-2">{dependencies.map((dependency) => { const ready = dependency.predecessor.status === 'DONE'; return <li key={dependency.id} className="flex min-h-11 items-center gap-2 rounded-xl border px-3 py-2 text-xs"><span className={ready ? 'text-emerald-700' : 'text-amber-700'}>{dependency.predecessor.title}</span><span aria-hidden="true">→</span><span className="font-semibold text-slate-800">{dependency.successor.title}</span><span className={`ml-auto rounded-full px-2 py-1 text-[10px] font-semibold ${ready ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{ready ? 'Habilitada' : 'Bloqueada'}</span></li>; })}</ul>}</section>
+    {unscheduled.length > 0 && <aside className="rounded-2xl border border-dashed bg-slate-50 p-4"><h3 className="text-sm font-semibold text-slate-800">Sin programar ({unscheduled.length})</h3><p className="mt-1 text-xs text-slate-500">Asigna inicio y fin planificados desde la edición de la tarea.</p><ul className="mt-3 grid gap-2 sm:grid-cols-2">{unscheduled.map((task) => <li key={task.id} className="rounded-lg border bg-card px-3 py-2 text-xs text-slate-700">{task.title}</li>)}</ul></aside>}
   </section>;
 }

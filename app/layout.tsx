@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
+import { Toaster } from "@/components/ui/sonner";
+import { Bebas_Neue, Raleway } from "next/font/google";
 import "./globals.css";
 import "@/src/bones/registry";
+
+// Las mismas fuentes de la landing: Raleway para texto y Bebas Neue para títulos de página.
+const raleway = Raleway({ subsets: ["latin"], variable: "--font-raleway", display: "swap" });
+const bebas = Bebas_Neue({ weight: "400", subsets: ["latin"], variable: "--font-bebas", display: "swap" });
 
 export const metadata: Metadata = {
   title: "Foxcode — Portal de cliente",
@@ -16,8 +22,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" className="h-full antialiased font-sans">
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="es" data-scroll-behavior="smooth" className={`dark h-full antialiased font-sans ${raleway.variable} ${bebas.variable}`}>
+      <body className="min-h-full flex flex-col">{children}<Toaster /></body>
     </html>
   );
 }

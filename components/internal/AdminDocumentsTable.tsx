@@ -1,6 +1,5 @@
 'use client';
 
-import { DocumentActions } from './DocumentActions';
 import { useState } from 'react';
 import {
   DocumentPreviewModal,
@@ -8,30 +7,11 @@ import {
 } from '@/components/shared/DocumentPreviewModal';
 import { formatDate } from '@/lib/formatters';
 import { formatBytes } from '@/components/client/client-formatters';
-import {
-  getFilePreviewType,
-  getFileExtension,
-} from '@/src/lib/file-preview-helpers';
-import {
-  Archive,
-  Download,
-  Eye,
-  FileSpreadsheet,
-  FileText,
-  FileType,
-  Film,
-  Image as ImageIcon,
-} from 'lucide-react';
-
-const labels: Record<string, string> = {
-  COMMERCIAL_PROPOSAL: 'Propuesta',
-  SIGNED_CONTRACT: 'Contrato',
-  INVOICE: 'Factura',
-  PAYMENT_PROOF: 'Comprobante',
-  DELIVERABLE: 'Entregable',
-  INTERNAL_FILE: 'Interno',
-  OTHER: 'Otro',
-};
+import { getFilePreviewType } from '@/src/lib/file-preview-helpers';
+import { Download, Eye } from 'lucide-react';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { DocumentManageActions } from '@/components/documents/DocumentManageActions';
+import { DOCUMENT_TYPE_LABELS, DocumentIcon } from '@/components/documents/document-meta';
 
 export interface AdminDocumentItem {
   id: string;
@@ -52,31 +32,6 @@ export function AdminDocumentsTable({
   documents: AdminDocumentItem[];
 }) {
   const [selectedDoc, setSelectedDoc] = useState<DocumentPreviewTarget | null>(null);
-
-  const getDocIcon = (name: string) => {
-    const previewType = getFilePreviewType(name);
-    switch (previewType) {
-      case 'docx':
-        return <FileText size={18} className="text-blue-600" />;
-      case 'image':
-        return <ImageIcon size={18} className="text-emerald-600" />;
-      case 'pdf':
-        return <FileType size={18} className="text-red-600" />;
-      default: {
-        const ext = getFileExtension(name).toLowerCase();
-        if (['xlsx', 'xls', 'csv'].includes(ext)) {
-          return <FileSpreadsheet size={18} className="text-emerald-600" />;
-        }
-        if (['zip', 'rar', '7z'].includes(ext)) {
-          return <Archive size={18} className="text-amber-600" />;
-        }
-        if (['mp4', 'mov'].includes(ext)) {
-          return <Film size={18} className="text-purple-600" />;
-        }
-        return <FileText size={18} className="text-slate-500" />;
-      }
-    }
-  };
 
   return (
     <>
@@ -103,14 +58,14 @@ export function AdminDocumentsTable({
                   onClick={() => setSelectedDoc(doc)}
                 >
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 p-2 shadow-2xs">
-                    {getDocIcon(doc.originalName)}
+                    <DocumentIcon name={doc.originalName} />
                   </span>
                   <div className="min-w-0">
                     <p className="truncate font-semibold text-slate-900 hover:text-orange-600">
                       {doc.originalName}
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      {labels[doc.type] || doc.type} · {formatBytes(doc.size)} · Subido por{' '}
+                      {DOCUMENT_TYPE_LABELS[doc.type] || doc.type} · {formatBytes(doc.size)} · Subido por{' '}
                       <strong className="text-slate-700">{doc.uploadedBy.name}</strong> el{' '}
                       {formatDate(doc.createdAt)}
                     </p>
@@ -133,26 +88,28 @@ export function AdminDocumentsTable({
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center justify-end gap-2">
-                  <button
+                <div className="flex items-center justify-end gap-1">
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    title={isPreviewable ? 'Vista previa' : 'Ver info'}
+                    aria-label={`${isPreviewable ? 'Vista previa' : 'Ver info'} de ${doc.originalName}`}
                     onClick={() => setSelectedDoc(doc)}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50"
                   >
-                    <Eye size={13} />
-                    <span>{isPreviewable ? 'Vista previa' : 'Ver info'}</span>
-                  </button>
-
+                    <Eye aria-hidden />
+                  </Button>
                   <a
                     href={`/api/backend/documents/${doc.id}/download`}
                     download={doc.originalName}
-                    className="inline-flex items-center gap-1 rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-slate-800"
+                    title="Descargar"
+                    aria-label={`Descargar ${doc.originalName}`}
+                    className={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}
                   >
-                    <Download size={13} />
-                    <span>Descargar</span>
+                    <Download aria-hidden />
                   </a>
+                  <DocumentManageActions document={doc} />
                 </div>
-                <DocumentActions document={doc} />
               </div>
             );
           })}

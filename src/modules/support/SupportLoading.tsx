@@ -1,0 +1,4 @@
+ 'use client';
+import { Skeleton } from 'boneyard-js/react';
+export function SupportFixture() { return <div className="space-y-7" aria-hidden="true"><div className="h-12 w-80 max-w-full rounded bg-slate-200"/><div className="h-5 w-96 max-w-full rounded bg-slate-200"/><div className="h-16 max-w-3xl rounded-lg bg-slate-200"/><div className="flex gap-3"><div className="h-9 w-24 rounded bg-slate-200"/><div className="h-9 w-32 rounded bg-slate-200"/></div><div className="grid gap-8 md:grid-cols-[1fr_280px]"><div className="space-y-5">{[1,2,3,4].map(n=><div key={n} className="h-20 rounded bg-slate-200"/>)}</div><div className="h-80 rounded bg-slate-200"/></div></div> }
+export function SupportLoading() { const fixture=<SupportFixture/>;return <div role="status" aria-label="Cargando centro de ayuda"><Skeleton name="support-center" loading fixture={fixture} fallback={fixture} select="viewport">{fixture}</Skeleton></div> }

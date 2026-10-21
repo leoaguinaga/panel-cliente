@@ -1,7 +1,7 @@
 import { convertLeadToClientAction } from '@/src/modules/clients/server/actions';
 import { ActionForm } from '@/components/shared/ActionForm';
 import { getLeadById } from '@/src/modules/leads/server/queries';
-import { changeLeadStatusAction, markLeadAsLostAction, convertLeadToProjectAction } from '@/src/modules/leads/server/actions';
+import { changeLeadStatusAction, markLeadAsLostAction, convertLeadToProjectAction, setLeadNextActionAction } from '@/src/modules/leads/server/actions';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import {
@@ -82,7 +82,7 @@ export default async function LeadDetailPage({
           {lead.status !== 'WON' && (
             <form action={handleConvert} className="flex flex-wrap items-center gap-2">
               <label className="sr-only" htmlFor="convert-project-type">Tipo de proyecto</label>
-              <select id="convert-project-type" name="projectType" defaultValue={defaultProjectTypeForLead(lead.type)} className="h-8 rounded-md border bg-white px-2 text-xs">
+              <select id="convert-project-type" name="projectType" defaultValue={defaultProjectTypeForLead(lead.type)} className="h-8 rounded-md border bg-card px-2 text-xs">
                 {projectTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
               <Button type="submit" size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5">
@@ -98,7 +98,7 @@ export default async function LeadDetailPage({
         {/* Left column info */}
         <div className="md:col-span-2 space-y-6">
           {/* Main Info Card */}
-          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs space-y-4">
+          <div className="bg-card border border-slate-200 rounded-xl p-6 shadow-xs space-y-4">
             <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
               Información del Negocio & Contacto
             </h2>
@@ -174,7 +174,7 @@ export default async function LeadDetailPage({
 
         {/* Right column status */}
         <div className="space-y-6">
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
+          <div className="bg-card border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
             <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
               Estado del Pipeline
             </h3>
@@ -194,15 +194,24 @@ export default async function LeadDetailPage({
                 <select
                   name="status"
                   defaultValue={lead.status}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-md text-xs font-medium bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-md text-xs font-medium bg-slate-50 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   {Object.entries(leadStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select>
               </div>
 
-              <Button type="submit" size="sm" className="w-full bg-slate-900 hover:bg-black text-white text-xs">
+              <Button type="submit" size="sm" className="w-full bg-brand-button hover:bg-brand-hover text-white text-xs">
                 Actualizar Etapa
               </Button>
+            </form>
+
+            <form action={setLeadNextActionAction.bind(null, lead.id)} className="space-y-2 border-t border-slate-100 pt-4">
+              <label htmlFor="lead-next-action" className="block text-xs font-semibold text-slate-700">Próximo seguimiento</label>
+              <div className="flex gap-2">
+                <input id="lead-next-action" type="date" name="nextActionAt" defaultValue={lead.nextActionAt?.slice(0, 10) ?? ''} className="min-w-0 flex-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary" />
+                <Button type="submit" size="sm" variant="outline" className="text-xs">Guardar</Button>
+              </div>
+              <p className="text-[11px] text-slate-500">Aparecerá en tu Inicio ese día. Déjalo vacío para quitarlo.</p>
             </form>
 
             <dl className="space-y-2.5 pt-4 border-t border-slate-100 text-xs">

@@ -3,6 +3,7 @@
 import * as React from "react"
 import {
   LayoutDashboard,
+  CalendarDays,
   UsersRound,
   Users,
   ListChecks,
@@ -12,12 +13,14 @@ import {
   CreditCard,
   Settings,
   Flame,
+  BookOpen,
+  MessagesSquare,
 } from "lucide-react"
 
 import { NavMain } from "@/components/layout/NavMain"
 import { NavProjects } from "@/components/layout/NavProjects"
-import { NavUser } from "@/components/layout/NavUser"
-import { TeamSwitcher } from "@/components/layout/TeamSwitcher"
+import { NavUser, type NavUserData } from "@/components/layout/NavUser"
+import { WorkspaceSwitcher, type SwitcherWorkspace } from "@/components/layout/WorkspaceSwitcher"
 import {
   Sidebar,
   SidebarContent,
@@ -27,37 +30,13 @@ import {
 } from "@/components/ui/sidebar"
 import { ROUTES } from "@/lib/constants"
 
-function FoxcodeLogoIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M4 4h16v4H8v4h10v4H8v4H4z" />
-    </svg>
-  )
-}
-
-const ServicesIcon = React.forwardRef<SVGSVGElement, React.SVGProps<SVGSVGElement>>(function ServicesIcon(props, ref) {
-  return (
-    <svg ref={ref} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
-      <path d="M14.7 6.3a4.2 4.2 0 0 0-5.5 5.5L4.1 16.9a2.1 2.1 0 0 0 3 3l5.1-5.1a4.2 4.2 0 0 0 5.5-5.5l-2.6 2.6-2.6-.5-.5-2.6 2.7-2.5Z" />
-      <path d="m17.5 4.5 2 2" />
-    </svg>
-  )
-})
-
-const teams = [
-  {
-    name: "FoxCode",
-    logo: FoxcodeLogoIcon,
-    plan: "Panel Operativo",
-  },
-]
-
 const navMain = [
   {
     title: "Inicio",
     url: ROUTES.internal.dashboard,
     icon: LayoutDashboard,
   },
+  { title: "Calendario", url: "/internal/calendar", icon: CalendarDays },
   { title: "Tareas", url: "/internal/tasks", icon: ListChecks },
   {
     title: "Proyectos",
@@ -76,16 +55,15 @@ const navMain = [
   },
 ]
 
+// Colaboradores y Configuración son solo de administración; a un colaborador lo redirigen.
+const adminOnly = new Set<string>([ROUTES.internal.workers, ROUTES.internal.settings])
+
 const navSecondary = [
+  { name: "Atención al cliente", url: "/internal/support", icon: MessagesSquare },
   {
     name: "Productos",
     url: ROUTES.internal.products,
     icon: Box,
-  },
-  {
-    name: "Servicios",
-    url: ROUTES.internal.services,
-    icon: ServicesIcon,
   },
   {
     name: "Documentos",
@@ -93,9 +71,14 @@ const navSecondary = [
     icon: FileText,
   },
   {
-    name: "Pagos",
+    name: "Cobros",
     url: ROUTES.internal.payments,
     icon: CreditCard,
+  },
+  {
+    name: "Guías",
+    url: ROUTES.internal.guides,
+    icon: BookOpen,
   },
   {
     name: "Colaboradores",
@@ -111,23 +94,22 @@ const navSecondary = [
 
 export function AppSidebar({
   user,
+  workspaces = [],
+  activeWorkspace = "all",
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
-  user?: {
-    name?: string | null
-    email?: string | null
-    avatar?: string | null
-    role?: string | null
-  } | null
+  user?: NavUserData | null
+  workspaces?: SwitcherWorkspace[]
+  activeWorkspace?: string
 }) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <TeamSwitcher teams={teams} />
+        <WorkspaceSwitcher workspaces={workspaces} active={activeWorkspace} />
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={navMain} label="Operaciones" />
-        <NavProjects items={navSecondary} label="Gestión" />
+        <NavProjects items={user?.role === "ADMIN" ? navSecondary : navSecondary.filter((item) => !adminOnly.has(item.url))} label="Gestión" />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={user} />

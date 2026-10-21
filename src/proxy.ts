@@ -1,83 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getSessionCookie } from "better-auth/cookies";
 import { ROLES } from "./modules/auth/server/permissions";
 
+// Optimistic check: only looks at the session cookie. Role and status are
+// validated by requireAuth in the /internal and /client layouts, so the proxy
+// doesn't call the backend on every request (prefetches, HEAD probes, etc.).
 export async function proxy(request: NextRequest) {
-  // Fetch the session through Better Auth's route to avoid importing Prisma here.
-  const sessionUrl = new URL("/api/auth/get-session", request.url);
-
-  let session = null;
-  try {
-    const response = await fetch(sessionUrl.toString(), {
-      cache: "no-store",
-      headers: {
-        cookie: request.headers.get("cookie") || "",
-      },
-    });
-    if (response.ok) {
-      session = await response.json();
-    }
-  } catch (error) {
-    console.error("Error fetching session in proxy", error);
-  }
-
   const url = request.nextUrl.clone();
+  const hasSessionCookie = Boolean(getSessionCookie(request));
 
   const isInternalRoute = url.pathname.startsWith("/internal");
   const isClientRoute = url.pathname.startsWith("/client");
   const isAuthRoute = url.pathname === "/login" || url.pathname === "/";
 
-  if (!session || !session.user) {
-    if (isInternalRoute || isClientRoute) {
-      url.pathname = "/login";
-      return NextResponse.redirect(url);
-    }
-    return NextResponse.next();
-  }
-
-  const userRole = session.user.role;
-  const userStatus = session.user.status;
-
-  if (!Object.values(ROLES).includes(userRole) || userStatus !== "ACTIVE") {
-    if (isInternalRoute || isClientRoute) {
-      url.pathname = "/login";
-      return NextResponse.redirect(url);
-    }
-    return NextResponse.next();
-  }
-
-  if (isAuthRoute) {
-    if (userRole === ROLES.ADMIN || userRole === ROLES.WORKER) {
-      url.pathname = "/internal/dashboard";
-    } else {
-      url.pathname = "/client/dashboard";
-    }
+  if (isInternalRoute || isClientRoute) {
+    if (hasSessionCookie) return NextResponse.next();
+    url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  if (isInternalRoute) {
-    if (userRole === ROLES.CLIENT) {
-      url.pathname = "/client/dashboard";
-      return NextResponse.redirect(url);
-    }
-
-    if (
-      userRole === ROLES.WORKER &&
-      (url.pathname.startsWith("/internal/workers") ||
-        url.pathname.startsWith("/internal/settings"))
-    ) {
-      url.pathname = "/internal/dashboard";
-      return NextResponse.redirect(url);
-    }
+  // Only a real page visit to / or /login needs the role, to send the user to
+  // their dashboard.
+  if (!isAuthRoute || !hasSessionCookie || request.method !== "GET") {
+    return NextResponse.next();
   }
 
-  if (isClientRoute && (userRole === ROLES.ADMIN || userRole === ROLES.WORKER)) {
-    url.pathname = "/internal/dashboard";
-    return NextResponse.redirect(url);
+  let session = null;
+  try {
+    const response = await fetch(new URL("/api/auth/get-session", request.url), {
+      cache: "no-store",
+      headers: { cookie: request.headers.get("cookie") || "" },
+    });
+    if (response.ok) session = await response.json();
+  } catch (error) {
+    console.error("Error fetching session in proxy", error);
   }
 
-  return NextResponse.next();
+  const userRole = session?.user?.role;
+  if (!Object.values(ROLES).includes(userRole) || session.user.status !== "ACTIVE") {
+    return NextResponse.next();
+  }
+
+  url.pathname = userRole === ROLES.CLIENT ? "/client/dashboard" : "/internal/dashboard";
+  return NextResponse.redirect(url);
 }
-
-export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
-};

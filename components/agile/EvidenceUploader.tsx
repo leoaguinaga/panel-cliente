@@ -1,27 +1,40 @@
 'use client';
 
-import { useState, useTransition, useEffect } from 'react';
-import { addTaskEvidenceAction, deleteTaskEvidenceAction } from '@/src/modules/projects/server/actions';
+import { useState, useTransition, useEffect, useRef } from 'react';
+import { deleteTaskEvidenceAction } from '@/src/modules/projects/server/actions';
+import { addTaskEvidenceAction } from '@/src/modules/projects/server/task-actions';
+import type { TaskEvidence } from '@/src/modules/projects/types';
 import { Button } from '@/components/ui/button';
-import { Camera, Image as ImageIcon, Trash2, Upload, Sparkles, CheckCircle2, FileText } from 'lucide-react';
+import { Camera, ExternalLink, FileText, Image as ImageIcon, Link2, Trash2, Upload } from 'lucide-react';
 import { formatDate } from '@/lib/formatters';
 
-export type TaskEvidenceItem = {
-  id: string;
-  title: string | null;
-  fileUrl: string;
-  notes: string | null;
-  createdAt: string;
-  uploadedBy?: { id: string; name: string } | null;
-};
+export type TaskEvidenceItem = TaskEvidence;
+type Kind = TaskEvidence['kind'];
 
 const EMPTY_EVIDENCES: TaskEvidenceItem[] = [];
+const KINDS: Array<{ id: Kind; label: string; icon: typeof Link2 }> = [
+  { id: 'LINK', label: 'Enlace', icon: Link2 },
+  { id: 'IMAGE', label: 'Imagen', icon: ImageIcon },
+  { id: 'NOTE', label: 'Nota', icon: FileText },
+];
+
+const isHttpUrl = (value: string) => /^https?:\/\/\S+$/i.test(value.trim());
+const hostOf = (value: string) => {
+  try {
+    return new URL(value).hostname.replace(/^www\./, '');
+  } catch {
+    return value;
+  }
+};
+const isEditable = (target: EventTarget | null) =>
+  target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
 
 export function EvidenceModal({
   projectId,
   taskId,
   taskTitle,
   evidences = EMPTY_EVIDENCES,
+  requiresEvidence = false,
   isOpen,
   onClose,
 }: {
@@ -29,16 +42,20 @@ export function EvidenceModal({
   taskId: string;
   taskTitle: string;
   evidences: TaskEvidenceItem[];
+  requiresEvidence?: boolean;
   isOpen: boolean;
   onClose: () => void;
 }) {
   const [items, setItems] = useState<TaskEvidenceItem[]>(evidences);
+  const [kind, setKind] = useState<Kind>('LINK');
   const [title, setTitle] = useState('');
-  const [fileUrl, setFileUrl] = useState('');
+  const [link, setLink] = useState('');
+  const [image, setImage] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const linkRef = useRef<HTMLInputElement>(null);
 
   const [previousEvidences, setPreviousEvidences] = useState(evidences);
   if (previousEvidences !== evidences) {
@@ -46,74 +63,95 @@ export function EvidenceModal({
     setItems(evidences);
   }
 
-  // Handle Ctrl+V / Clipboard Paste of Screenshot
+  const readImage = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setError('Ese archivo no es una imagen (PNG, JPG o WebP).');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setImage(event.target?.result as string);
+      setKind('IMAGE');
+      setError(null);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Cmd/Ctrl+V fuera de un campo: una imagen va a «Imagen» y una URL a «Enlace».
   useEffect(() => {
     if (!isOpen) return;
     const handlePaste = (e: ClipboardEvent) => {
-      const clipboardItems = e.clipboardData?.items;
-      if (!clipboardItems) return;
-
-      for (let i = 0; i < clipboardItems.length; i++) {
-        const item = clipboardItems[i];
-        if (item.type.indexOf('image') !== -1) {
-          const blob = item.getAsFile();
-          if (blob) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-              const base64 = event.target?.result as string;
-              setPreviewImage(base64);
-              setFileUrl(base64);
-              if (!title) setTitle(`Captura de pantalla ${new Date().toLocaleTimeString()}`);
-            };
-            reader.readAsDataURL(blob);
-          }
-        }
+      const file = Array.from(e.clipboardData?.items || [])
+        .find((item) => item.type.startsWith('image/'))
+        ?.getAsFile();
+      if (file) {
+        e.preventDefault();
+        readImage(file);
+        return;
+      }
+      if (isEditable(e.target)) return;
+      const pasted = e.clipboardData?.getData('text')?.trim() || '';
+      if (isHttpUrl(pasted)) {
+        e.preventDefault();
+        setKind('LINK');
+        setLink(pasted);
+        setError(null);
       }
     };
-
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
-  }, [isOpen, title]);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    // En captura: Escape cierra solo este modal, no el detalle de la tarea de abajo.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      onClose();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const base64 = event.target?.result as string;
-        setPreviewImage(base64);
-        setFileUrl(base64);
-        if (!title) setTitle(file.name);
-      };
-      reader.readAsDataURL(file);
-    }
+  const ready = kind === 'LINK' ? isHttpUrl(link) : kind === 'IMAGE' ? Boolean(image) : Boolean(notes.trim());
+
+  const reset = () => {
+    setTitle('');
+    setLink('');
+    setImage(null);
+    setNotes('');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fileUrl) {
-      setError('Por favor sube una captura o pega una imagen del portapapeles (Ctrl+V)');
+    if (!ready) {
+      setError(
+        kind === 'LINK'
+          ? 'Pega un enlace que empiece con http:// o https://'
+          : kind === 'IMAGE'
+            ? 'Adjunta o pega una imagen (Cmd/Ctrl+V)'
+            : 'Escribe la nota',
+      );
       return;
     }
     setError(null);
-
-    const formData = new FormData();
-    formData.append('title', title || 'Evidencia de cumplimiento');
-    formData.append('fileUrl', fileUrl);
-    formData.append('notes', notes);
-
     startTransition(async () => {
-      try {
-        await addTaskEvidenceAction(projectId, taskId, formData);
-        setPreviewImage(null);
-        setFileUrl('');
-        setTitle('');
-        setNotes('');
-      } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : 'Error al guardar evidencia');
+      const result = await addTaskEvidenceAction(projectId, taskId, {
+        kind,
+        title: title.trim() || undefined,
+        fileUrl: kind === 'LINK' ? link.trim() : kind === 'IMAGE' ? image! : undefined,
+        notes: notes.trim() || undefined,
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
       }
+      const created = result.evidence;
+      if (created) setItems((prev) => [created, ...prev.filter((it) => it.id !== created.id)]);
+      reset();
     });
   };
 
@@ -128,151 +166,172 @@ export function EvidenceModal({
     });
   };
 
+  const field = 'w-full rounded-md border bg-card px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-primary';
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-2xl rounded-xl border bg-white shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95">
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 pt-[10vh]" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="evidence-title"
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-2xl rounded-xl border bg-card shadow-2xl overflow-hidden flex flex-col max-h-[80vh] animate-in fade-in zoom-in-95"
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b px-6 py-4 bg-slate-50">
-          <div>
-            <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
-              <Camera className="w-5 h-5 text-blue-600" />
-              Evidencias de Cumplimiento
+          <div className="min-w-0">
+            <h3 id="evidence-title" className="font-bold text-base text-slate-900 flex items-center gap-2">
+              <Camera className="w-5 h-5 text-blue-600" aria-hidden="true" />
+              Evidencias de cumplimiento
             </h3>
             <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
               Tarea: <span className="font-medium text-slate-800">{taskTitle}</span>
+              {requiresEvidence && (
+                <span className={`ml-2 rounded px-1.5 py-0.5 text-[10px] font-semibold ${items.length ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                  {items.length ? 'Requisito cumplido' : 'Requerida para terminar'}
+                </span>
+              )}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 text-lg p-1"
-          >
+          <button type="button" onClick={onClose} aria-label="Cerrar" className="text-slate-400 hover:text-slate-600 text-lg p-1">
             ✕
           </button>
         </div>
 
         <div className="p-6 space-y-6 overflow-y-auto flex-1">
-          {/* Upload / Paste Area */}
-          <form onSubmit={handleSubmit} className="rounded-xl border border-dashed border-slate-300 bg-slate-50/50 p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-amber-500" />
-                Adjuntar Captura de Pantalla
-              </span>
-              <span className="text-[11px] text-muted-foreground bg-white px-2 py-0.5 rounded border">
-                Tip: Presiona <b>Ctrl+V</b> / <b>Cmd+V</b> para pegar captura directa
+          <form onSubmit={handleSubmit} className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div role="tablist" aria-label="Tipo de evidencia" className="inline-flex rounded-lg border bg-card p-0.5">
+                {KINDS.map(({ id, label, icon: Icon }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="tab"
+                    aria-selected={kind === id}
+                    onClick={() => {
+                      setKind(id);
+                      setError(null);
+                      if (id === 'LINK') requestAnimationFrame(() => linkRef.current?.focus());
+                    }}
+                    className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${kind === id ? 'bg-slate-100 text-slate-900' : 'text-slate-500 hover:text-slate-800'}`}
+                  >
+                    <Icon className="size-3.5" aria-hidden="true" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <span className="text-[11px] text-muted-foreground">
+                Pega con <b>Cmd/Ctrl+V</b>: una URL o una captura
               </span>
             </div>
 
-            {/* Drop / Preview Container */}
-            {previewImage ? (
-              <div className="relative rounded-lg border overflow-hidden bg-slate-900/5 max-h-48 flex items-center justify-center group">
-                <img src={previewImage} alt="Preview" className="max-h-48 object-contain" />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPreviewImage(null);
-                    setFileUrl('');
-                  }}
-                  className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded shadow-md text-xs hover:bg-red-700"
-                >
-                  Quitar captura
-                </button>
-              </div>
-            ) : (
-              <label className="border-2 border-dashed border-slate-200 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-blue-50/40 hover:border-blue-300 transition-colors">
-                <Upload className="w-8 h-8 text-slate-400 mb-2" />
-                <span className="text-xs font-medium text-slate-700">
-                  Haz clic para seleccionar imagen o arrastra el archivo
-                </span>
-                <span className="text-[11px] text-slate-400 mt-0.5">PNG, JPG, WebP o pega directamente</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-              </label>
+            {kind === 'LINK' && (
+              <input
+                ref={linkRef}
+                type="url"
+                inputMode="url"
+                autoFocus
+                placeholder="https://… (PR, commit, deploy, documento)"
+                value={link}
+                onChange={(e) => setLink(e.target.value)}
+                className={field}
+              />
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <input
-                placeholder="Título o concepto (ej. Deploy en Vercel)"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="rounded-md border bg-white px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-primary"
-              />
-              <input
-                placeholder="Notas u observaciones adicionales..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="rounded-md border bg-white px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
+            {kind === 'IMAGE' &&
+              (image ? (
+                <div className="relative rounded-lg border overflow-hidden bg-black/5 max-h-48 flex items-center justify-center">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={image} alt="Vista previa" className="max-h-48 object-contain" />
+                  <button
+                    type="button"
+                    onClick={() => setImage(null)}
+                    className="absolute top-2 right-2 bg-red-600 text-white px-2 py-1 rounded shadow-md text-xs hover:bg-red-700"
+                  >
+                    Quitar
+                  </button>
+                </div>
+              ) : (
+                <label
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragging(true);
+                  }}
+                  onDragLeave={() => setDragging(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragging(false);
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) readImage(file);
+                  }}
+                  className={`border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer transition-colors ${dragging ? 'border-blue-400 bg-blue-50/40' : 'border-slate-200 hover:bg-blue-50/40 hover:border-blue-300'}`}
+                >
+                  <Upload className="w-7 h-7 text-slate-400 mb-2" aria-hidden="true" />
+                  <span className="text-xs font-medium text-slate-700">Selecciona, arrastra o pega una imagen</span>
+                  <span className="text-[11px] text-slate-400 mt-0.5">PNG, JPG o WebP</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) readImage(file);
+                      e.target.value = '';
+                    }}
+                    className="hidden"
+                  />
+                </label>
+              ))}
 
-            {error && <p className="text-xs text-red-600">{error}</p>}
+            {kind === 'NOTE' ? (
+              <>
+                <textarea
+                  autoFocus
+                  rows={4}
+                  placeholder="¿Qué se hizo y cómo se comprobó? (ej. Probado con el cliente en llamada, aprobó el flujo)"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className={`${field} resize-y`}
+                />
+                <input placeholder="Título (opcional)" value={title} onChange={(e) => setTitle(e.target.value)} className={field} />
+              </>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input
+                  placeholder={kind === 'LINK' ? 'Título (opcional, por defecto el enlace)' : 'Título (opcional)'}
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className={field}
+                />
+                <input placeholder="Nota (opcional)" value={notes} onChange={(e) => setNotes(e.target.value)} className={field} />
+              </div>
+            )}
+
+            {error && <p role="alert" className="text-xs text-red-600">{error}</p>}
 
             <div className="flex justify-end pt-1">
-              <Button disabled={isPending || !fileUrl} type="submit" size="sm" className="bg-slate-900 hover:bg-black text-white text-xs">
-                {isPending ? 'Guardando...' : 'Guardar Evidencia'}
+              <Button disabled={isPending || !ready} type="submit" size="sm" className="bg-brand-button hover:bg-brand-hover text-white text-xs">
+                {isPending ? 'Guardando...' : 'Guardar evidencia'}
               </Button>
             </div>
           </form>
 
-          {/* List of existing evidences */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center justify-between">
-              <span>Evidencias Registradas ({items.length})</span>
-            </h4>
+            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Evidencias registradas ({items.length})</h4>
 
             {items.length === 0 ? (
               <p className="text-center py-6 text-xs text-muted-foreground border rounded-lg bg-slate-50">
-                Aún no hay evidencias cargadas para esta tarea. Sube una captura para validar su cumplimiento.
+                Aún no hay evidencias. Un enlace al PR o al deploy, una captura o una nota bastan.
               </p>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <ul className="space-y-2">
                 {items.map((ev) => (
-                  <div key={ev.id} className="rounded-lg border bg-white p-3 shadow-xs space-y-2 group relative">
-                    <div className="relative rounded overflow-hidden bg-slate-100 h-36 flex items-center justify-center border">
-                      <img
-                        src={ev.fileUrl}
-                        alt={ev.title || 'Evidencia'}
-                        className="h-full w-full object-cover group-hover:scale-105 transition-transform"
-                      />
-                      <a
-                        href={ev.fileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center text-white opacity-0 group-hover:opacity-100 font-medium text-xs gap-1"
-                      >
-                        <ImageIcon className="w-4 h-4" /> Ver completa
-                      </a>
-                    </div>
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-xs font-semibold text-slate-900 line-clamp-1">{ev.title || 'Evidencia'}</p>
-                        {ev.notes && <p className="text-[11px] text-slate-500 line-clamp-2">{ev.notes}</p>}
-                        <p className="text-[10px] text-slate-400 mt-1">
-                          Subido por: {ev.uploadedBy?.name || 'Equipo'} · {formatDate(ev.createdAt)}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(ev.id)}
-                        className="text-slate-300 hover:text-red-600 p-1 transition-colors"
-                        title="Eliminar evidencia"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
+                  <EvidenceRow key={ev.id} evidence={ev} onDelete={() => handleDelete(ev.id)} disabled={isPending} />
                 ))}
-              </div>
+              </ul>
             )}
           </div>
         </div>
 
-        {/* Footer */}
         <div className="border-t px-6 py-3 bg-slate-50 flex justify-end">
           <Button type="button" variant="outline" onClick={onClose} size="sm">
             Cerrar
@@ -280,5 +339,42 @@ export function EvidenceModal({
         </div>
       </div>
     </div>
+  );
+}
+
+function EvidenceRow({ evidence: ev, onDelete, disabled }: { evidence: TaskEvidenceItem; onDelete: () => void; disabled: boolean }) {
+  const kind = ev.kind;
+  const Icon = kind === 'LINK' ? Link2 : kind === 'NOTE' ? FileText : ImageIcon;
+  return (
+    <li className="flex items-start gap-3 rounded-lg border bg-card p-3">
+      {kind === 'IMAGE' && ev.fileUrl ? (
+        <a href={ev.fileUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 overflow-hidden rounded border bg-slate-100" title="Ver completa">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={ev.fileUrl} alt={ev.title || 'Evidencia'} className="size-16 object-cover" />
+        </a>
+      ) : (
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-md border bg-slate-50 text-slate-500">
+          <Icon className="size-4" aria-hidden="true" />
+        </span>
+      )}
+      <div className="min-w-0 flex-1">
+        {kind === 'LINK' && ev.fileUrl ? (
+          <a href={ev.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex max-w-full items-center gap-1 text-xs font-semibold text-slate-900 hover:underline">
+            <span className="truncate">{ev.title || hostOf(ev.fileUrl)}</span>
+            <ExternalLink className="size-3 shrink-0 text-slate-400" aria-hidden="true" />
+          </a>
+        ) : (
+          <p className="text-xs font-semibold text-slate-900 line-clamp-1">{ev.title || 'Evidencia'}</p>
+        )}
+        {kind === 'LINK' && ev.fileUrl && <p className="truncate text-[11px] text-slate-400">{hostOf(ev.fileUrl)}</p>}
+        {ev.notes && <p className={`text-[11px] text-slate-500 ${kind === 'NOTE' ? 'whitespace-pre-wrap' : 'line-clamp-2'}`}>{ev.notes}</p>}
+        <p className="text-[10px] text-slate-400 mt-1">
+          {ev.uploadedBy?.name || 'Equipo'} · {formatDate(ev.createdAt)}
+        </p>
+      </div>
+      <button type="button" onClick={onDelete} disabled={disabled} className="text-slate-300 hover:text-red-600 p-1 transition-colors" title="Eliminar evidencia" aria-label="Eliminar evidencia">
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+    </li>
   );
 }

@@ -1,35 +1,21 @@
-'use client';
-
-import { useState } from 'react';
+"use client";
+import { useState, type ReactNode } from "react";
+import type { PaymentChannelConfig } from "@/src/modules/payments/channels";
+import { formatDate, formatMoney, paymentStatus } from "./client-formatters";
+import { ClientReportPaymentModal } from "./ClientReportPaymentModal";
+import { PaymentMethodsGuide } from "./PaymentMethodsGuide";
 import {
-  formatDate,
-  formatMoney,
-  paymentStatus,
-  paymentStatusStyles,
-} from '@/components/client/client-formatters';
-import { formatPaymentChannelName } from '@/src/modules/payments/channels';
-import { ClientReportPaymentModal } from '@/components/client/ClientReportPaymentModal';
-import { PaymentMethodsGuide } from '@/components/client/PaymentMethodsGuide';
-import {
-  ArrowUpRight,
-  Building2,
-  Check,
-  CheckCircle2,
-  CircleDollarSign,
-  Clock,
-  Clock3,
-  ExternalLink,
-  Eye,
-  FileCheck,
-  FileText,
-  HelpCircle,
-  Receipt,
-  Smartphone,
-  UploadCloud,
-  X,
-} from 'lucide-react';
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import Link from "next/link";
 
 export interface ClientPaymentItem {
+  paidAmount?: number;
+  milestone?: { title: string } | null;
   id: string;
   concept: string;
   amount: number | string;
@@ -48,333 +34,396 @@ export interface ClientPaymentItem {
   project: { name: string } | null;
 }
 
+const groups = [
+  {
+    key: "pending",
+    label: "Por pagar",
+    statuses: ["PENDING", "PARTIAL", "OVERDUE"],
+  },
+  { key: "review", label: "En revisión", statuses: ["UNDER_REVIEW"] },
+  { key: "scheduled", label: "Programadas", statuses: ["SCHEDULED"] },
+  { key: "paid", label: "Pagadas", statuses: ["PAID"] },
+  { key: "cancelled", label: "Canceladas", statuses: ["CANCELLED"] },
+];
+const paid = (p: ClientPaymentItem) =>
+  p.status === "PAID" ? Number(p.amount) : Number(p.paidAmount ?? 0);
+const balance = (p: ClientPaymentItem) =>
+  Math.max(0, Number(p.amount) - paid(p));
+const condition = (p: ClientPaymentItem) =>
+  p.status === "SCHEDULED"
+    ? p.milestone
+      ? `Se habilita al aprobar «${p.milestone.title}»`
+      : "Condición de habilitación por confirmar"
+    : p.status === "PAID"
+      ? p.paidAt
+        ? `Pago confirmado el ${formatDate(p.paidAt)}`
+        : "Pago confirmado"
+      : p.status === "UNDER_REVIEW"
+        ? "Comprobante enviado · pendiente de revisión"
+        : p.status === "CANCELLED"
+          ? "Esta cuota fue cancelada"
+          : p.dueDate
+            ? `Vence el ${formatDate(p.dueDate)}`
+            : "Fecha de vencimiento por definir";
+const button =
+  "rounded-lg border px-3 py-2 text-sm font-semibold hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+const primary =
+  "rounded-lg bg-brand-button px-4 py-2 text-sm font-semibold text-white hover:bg-brand-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 export function ClientPaymentsView({
   payments,
+  channels = [],
+  instructions = "",
+  fiscalInformation,
 }: {
   payments: ClientPaymentItem[];
+  channels?: PaymentChannelConfig[];
+  instructions?: string;
+  fiscalInformation?: ReactNode;
 }) {
-  const [reportingPayment, setReportingPayment] = useState<ClientPaymentItem | null>(null);
-  const [previewingPayment, setPreviewingPayment] = useState<ClientPaymentItem | null>(null);
-
-  const pendingPayments = payments.filter((p) =>
-    ['PENDING', 'PARTIAL', 'OVERDUE'].includes(p.status)
-  );
-  const underReviewPayments = payments.filter((p) => p.status === 'UNDER_REVIEW');
-  const paidPayments = payments.filter((p) => p.status === 'PAID');
-
-  const pendingAmount = pendingPayments.reduce((sum, p) => sum + Number(p.amount), 0);
-  const underReviewAmount = underReviewPayments.reduce((sum, p) => sum + Number(p.amount), 0);
-  const paidAmount = paidPayments.reduce((sum, p) => sum + Number(p.amount), 0);
-
-  const currency = payments[0]?.currency || 'PEN';
-
+  const [filter, setFilter] = useState("all");
+  const [detail, setDetail] = useState<ClientPaymentItem | null>(null);
+  const [report, setReport] = useState<ClientPaymentItem | null>(null);
+  const [accounts, setAccounts] = useState(false);
+  const pending = payments.filter((p) => groups[0].statuses.includes(p.status));
+  const review = payments.filter((p) => p.status === "UNDER_REVIEW");
+  const scheduled = payments.filter((p) => p.status === "SCHEDULED");
+  const currencies = [...new Set(payments.map((p) => p.currency))].sort();
+  const startReport = (p: ClientPaymentItem) => {
+    setDetail(null);
+    setReport(p);
+  };
   return (
-    <div className="space-y-6">
-      {/* Top Metrics Cards */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="flex flex-col justify-between rounded-2xl bg-slate-950 p-5 text-white shadow-xs">
-          <div>
-            <p className="text-xs font-medium text-slate-400">Saldo por pagar</p>
-            <p className="mt-1 text-2xl font-bold tracking-tight">
-              {formatMoney(pendingAmount, currency)}
-            </p>
-          </div>
-          <p className="mt-3 text-xs text-slate-400">
-            {pendingPayments.length} {pendingPayments.length === 1 ? 'cuota pendiente' : 'cuotas pendientes'}
+    <div className="space-y-8 text-foreground">
+      <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Pagos</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Tus cuotas, sus condiciones y el estado de cada pago.
           </p>
         </div>
-
-        <div className="flex flex-col justify-between rounded-2xl border border-amber-200 bg-amber-50/70 p-5 text-amber-950 shadow-xs">
-          <div>
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-800">
-              <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-              <span>En validación</span>
-            </div>
-            <p className="mt-1 text-2xl font-bold tracking-tight text-amber-950">
-              {formatMoney(underReviewAmount, currency)}
-            </p>
-          </div>
-          <p className="mt-3 text-xs text-amber-700">
-            {underReviewPayments.length}{' '}
-            {underReviewPayments.length === 1
-              ? 'comprobante en revisión'
-              : 'comprobantes en revisión'}
-          </p>
-        </div>
-
-        <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-          <div>
-            <p className="text-xs font-medium text-slate-500">Total pagado</p>
-            <p className="mt-1 text-2xl font-bold tracking-tight text-emerald-700">
-              {formatMoney(paidAmount, currency)}
-            </p>
-          </div>
-          <p className="mt-3 text-xs text-slate-500">
-            {paidPayments.length} {paidPayments.length === 1 ? 'pago completado' : 'pagos completados'}
-          </p>
-        </div>
+        <button className={button} onClick={() => setAccounts(true)}>
+          Consultar cuentas de pago
+        </button>
       </div>
-
-      {/* Payment Methods Guide */}
-      <PaymentMethodsGuide />
-
-      {/* Payments List */}
-      <div>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-bold text-slate-900">Historial y próximos pagos</h2>
-          <span className="text-xs font-medium text-slate-500">
-            {payments.length} {payments.length === 1 ? 'registro' : 'registros'}
-          </span>
-        </div>
-
-        {payments.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
-            <Clock3 className="mx-auto mb-3 text-slate-400" size={32} />
-            <h3 className="font-semibold text-slate-900">No tienes pagos programados</h3>
-            <p className="mt-1 text-xs text-slate-500">
-              Cuando se programen nuevas cuotas de tus proyectos aparecerán aquí.
+      <div className="grid gap-9 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="min-w-0">
+          <section className="border-y py-6" aria-labelledby="payment-notice">
+            <h2 id="payment-notice" className="text-xl font-semibold">
+              {!payments.length
+                ? "Todo empieza con tu primera cuota"
+                : pending.length
+                  ? `Tienes ${pending.length === 1 ? "una cuota" : `${pending.length} cuotas`} por pagar`
+                  : review.length
+                    ? "Tu comprobante está en revisión"
+                    : scheduled.length
+                      ? "No tienes pagos exigibles por ahora"
+                      : "No tienes cuotas pendientes"}
+            </h2>
+            <p className="mt-2 max-w-prose text-sm text-muted-foreground">
+              {!payments.length
+                ? "Cuando se programe un pago para tus proyectos, podrás consultar aquí el importe y sus condiciones."
+                : pending.length
+                  ? "Consulta las cuentas disponibles. Si ya transferiste, reporta el pago para su revisión."
+                  : review.length
+                    ? "El equipo revisará tu reporte antes de confirmar el abono."
+                    : scheduled.length
+                      ? "Tus cuotas están programadas. Revisa la condición de cada una para saber cuándo se habilitará el pago."
+                      : "Puedes consultar tus movimientos y comprobantes más abajo."}
             </p>
+            {pending[0] && (
+              <button
+                className={`${primary} mt-4`}
+                onClick={() => setDetail(pending[0])}
+              >
+                Ver cuota y reportar pago
+              </button>
+            )}
+          </section>
+          <h2 className="mt-7 text-lg font-semibold">Mis cuotas</h2>
+          <div
+            className="mt-4 flex flex-wrap gap-1"
+            role="group"
+            aria-label="Filtrar cuotas"
+          >
+            {[
+              { key: "all", label: "Todas" },
+              ...groups.filter(
+                (g) =>
+                  g.key !== "cancelled" ||
+                  payments.some((p) => p.status === "CANCELLED"),
+              ),
+            ].map((g) => (
+              <button
+                key={g.key}
+                aria-pressed={filter === g.key}
+                className={`${button} border-transparent ${filter === g.key ? "bg-muted text-foreground" : "text-muted-foreground"}`}
+                onClick={() => setFilter(g.key)}
+              >
+                {g.label}
+              </button>
+            ))}
           </div>
-        ) : (
-          <div className="space-y-3">
-            {payments.map((payment) => {
-              const isPending = ['PENDING', 'PARTIAL', 'OVERDUE'].includes(payment.status);
-              const isUnderReview = payment.status === 'UNDER_REVIEW';
-              const isPaid = payment.status === 'PAID';
-
+          {groups
+            .filter((g) => filter === "all" || filter === g.key)
+            .map((g) => {
+              const rows = payments
+                .filter((p) => g.statuses.includes(p.status))
+                .sort((a, b) =>
+                  (a.dueDate || "9999").localeCompare(b.dueDate || "9999"),
+                );
+              if (!rows.length) return null;
               return (
-                <div
-                  key={payment.id}
-                  className={`rounded-2xl border bg-white p-5 shadow-xs transition hover:border-slate-300 ${
-                    isUnderReview
-                      ? 'border-amber-200 ring-1 ring-amber-400/20'
-                      : isPending
-                      ? 'border-slate-200'
-                      : 'border-slate-200/80 bg-slate-50/40'
-                  }`}
-                >
-                  <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-                    <div className="space-y-1.5">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="font-bold text-slate-900">{payment.concept}</h3>
+                <section key={g.key} className="mt-7">
+                  <h3 className="mb-3 text-sm font-medium text-muted-foreground">
+                    {g.key === "scheduled"
+                      ? "Programadas · aún no exigibles"
+                      : g.label}{" "}
+                    <span className="ml-2">{rows.length}</span>
+                  </h3>
+                  {rows.map((p) => (
+                    <article
+                      key={p.id}
+                      className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 border-t py-5"
+                    >
+                      <div className="min-w-0">
                         <span
-                          className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
-                            paymentStatusStyles[payment.status] || 'bg-slate-100 text-slate-700'
-                          }`}
+                          className={`inline-block rounded px-2 py-1 text-xs ${p.status === "UNDER_REVIEW" ? "bg-muted text-foreground" : p.status === "PAID" ? "bg-muted text-foreground" : "bg-muted text-muted-foreground"}`}
                         >
-                          {paymentStatus[payment.status] || payment.status}
+                          {paymentStatus[p.status] || p.status}
                         </span>
+                        <h4 className="mt-2 break-words text-sm font-semibold sm:text-base">
+                          {p.concept}
+                        </h4>
+                        <p className="mt-1 break-words text-xs text-muted-foreground sm:text-sm">
+                          {p.project?.name || "Pago general"}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
+                          {condition(p)}
+                        </p>
+                        {paid(p) > 0 && p.status !== "PAID" && (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Abonado: {formatMoney(paid(p), p.currency)} de{" "}
+                            {formatMoney(p.amount, p.currency)}
+                          </p>
+                        )}
                       </div>
-
-                      <p className="text-xs text-slate-500">
-                        {payment.project?.name || 'Pago general'} · Vence{' '}
-                        <strong>{formatDate(payment.dueDate)}</strong>
-                      </p>
-
-                      {/* Info if Under Review or Paid */}
-                      {isUnderReview && (
-                        <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-amber-800">
-                          <span className="flex items-center gap-1 font-medium">
-                            <Clock size={13} className="text-amber-600" />
-                            Comprobante enviado vía{' '}
-                            <strong>
-                              {formatPaymentChannelName(payment.paymentChannel)}
-                            </strong>
-                          </span>
-                          {payment.transactionReference && (
-                            <span className="font-mono text-[11px] text-amber-700">
-                              (N° {payment.transactionReference})
-                            </span>
+                      <div className="flex max-w-36 flex-col items-end gap-3 text-right">
+                        <p className="text-base font-semibold tabular-nums sm:text-lg">
+                          {formatMoney(
+                            ["PAID", "CANCELLED"].includes(p.status)
+                              ? p.amount
+                              : balance(p),
+                            p.currency,
                           )}
-                        </div>
-                      )}
-
-                      {isPaid && payment.paidAt && (
-                        <div className="flex items-center gap-1.5 pt-1 text-xs text-emerald-700">
-                          <CheckCircle2 size={13} />
-                          <span>
-                            Pagado el {formatDate(payment.paidAt)}{' '}
-                            {payment.paymentChannel
-                              ? `vía ${formatPaymentChannelName(payment.paymentChannel)}`
-                              : ''}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Amount & Actions */}
-                    <div className="flex flex-col items-start gap-2.5 sm:items-end">
-                      <p className="text-lg font-bold text-slate-950">
-                        {formatMoney(payment.amount, payment.currency)}
-                      </p>
-
-                      <div className="flex items-center gap-2">
-                        {/* If pending or overdue: Action to report payment */}
-                        {isPending && (
-                          <button
-                            type="button"
-                            onClick={() => setReportingPayment(payment)}
-                            className="flex items-center gap-1.5 rounded-xl bg-orange-600 px-4 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-orange-500"
-                          >
-                            <UploadCloud size={14} />
-                            <span>Ya pagué / Subir comprobante</span>
-                          </button>
-                        )}
-
-                        {/* If under review: View proof or replace proof */}
-                        {isUnderReview && (
-                          <>
-                            {payment.evidenceUrl && (
-                              <button
-                                type="button"
-                                onClick={() => setPreviewingPayment(payment)}
-                                className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                              >
-                                <Eye size={13} />
-                                <span>Ver comprobante</span>
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => setReportingPayment(payment)}
-                              className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100"
-                            >
-                              Actualizar constancia
-                            </button>
-                          </>
-                        )}
-
-                        {/* If paid: View receipt if exists */}
-                        {isPaid && payment.evidenceUrl && (
-                          <button
-                            type="button"
-                            onClick={() => setPreviewingPayment(payment)}
-                            className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                          >
-                            <Receipt size={13} />
-                            <span>Ver constancia</span>
-                          </button>
-                        )}
+                        </p>
+                        <button
+                          className={g.key === "pending" ? primary : button}
+                          onClick={() =>
+                            g.key === "pending" ? startReport(p) : setDetail(p)
+                          }
+                        >
+                          {g.key === "pending"
+                            ? "Reportar pago"
+                            : g.key === "scheduled"
+                              ? "Ver condición"
+                              : g.key === "review"
+                                ? "Ver reporte"
+                                : "Ver detalle"}
+                        </button>
                       </div>
-                    </div>
-                  </div>
+                    </article>
+                  ))}
+                </section>
+              );
+            })}
+          {!payments.some(
+            (p) =>
+              filter === "all" ||
+              groups.find((g) => g.key === filter)?.statuses.includes(p.status),
+          ) && (
+            <p className="py-10 text-sm text-muted-foreground">
+              No hay cuotas en este estado.
+            </p>
+          )}
+        </div>
+        <aside className="border-t pt-6 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-7">
+          <section className="border-b pb-6">
+            <h2 className="font-semibold">Estado de tu cuenta</h2>
+            {currencies.map((currency) => {
+              const rows = payments.filter((p) => p.currency === currency);
+              const summary = [
+                [
+                  "Por pagar",
+                  rows
+                    .filter((p) => groups[0].statuses.includes(p.status))
+                    .reduce((s, p) => s + balance(p), 0),
+                ],
+                [
+                  "En revisión",
+                  rows
+                    .filter((p) => p.status === "UNDER_REVIEW")
+                    .reduce((s, p) => s + balance(p), 0),
+                ],
+                [
+                  "Programado a futuro",
+                  rows
+                    .filter((p) => p.status === "SCHEDULED")
+                    .reduce((s, p) => s + balance(p), 0),
+                ],
+                ["Pagado y confirmado", rows.reduce((s, p) => s + paid(p), 0)],
+              ] as const;
+              return (
+                <div key={currency} className="mt-5">
+                  <h3 className="text-sm font-semibold">{currency}</h3>
+                  <dl className="mt-3 space-y-3">
+                    {summary.map(([label, value]) => (
+                      <div
+                        key={label}
+                        className="flex justify-between gap-3 text-xs"
+                      >
+                        <dt>{label}</dt>
+                        <dd className="font-semibold tabular-nums">
+                          {formatMoney(value, currency)}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
                 </div>
               );
             })}
-          </div>
-        )}
-      </div>
-
-      {/* Report Payment Modal */}
-      {reportingPayment && (
-        <ClientReportPaymentModal
-          payment={reportingPayment}
-          isOpen={Boolean(reportingPayment)}
-          onClose={() => setReportingPayment(null)}
-        />
-      )}
-
-      {/* Client Preview Modal */}
-      {previewingPayment && (
-        <ClientEvidenceViewerModal
-          payment={previewingPayment}
-          isOpen={Boolean(previewingPayment)}
-          onClose={() => setPreviewingPayment(null)}
-        />
-      )}
-    </div>
-  );
-}
-
-function ClientEvidenceViewerModal({
-  payment,
-  isOpen,
-  onClose,
-}: {
-  payment: ClientPaymentItem;
-  isOpen: boolean;
-  onClose: () => void;
-}) {
-  if (!isOpen || !payment.evidenceUrl) return null;
-
-  const isImage =
-    payment.evidenceMimeType?.startsWith('image/') ||
-    payment.evidenceOriginalName?.match(/\.(jpg|jpeg|png|webp|gif)$/i);
-
-  const inlineUrl = `${payment.evidenceUrl}?inline=1`;
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="client-evidence-title"
-      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/70 p-4 backdrop-blur-xs animate-in fade-in"
-    >
-      <div className="relative my-8 w-full max-w-xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
-        <div className="flex items-start justify-between border-b border-slate-100 p-5">
-          <div>
-            <span className="text-xs font-semibold text-orange-600">Comprobante de pago</span>
-            <h3 id="client-evidence-title" className="text-base font-bold text-slate-900">
-              {payment.concept}
-            </h3>
-            <p className="text-xs text-slate-500">
-              {formatPaymentChannelName(payment.paymentChannel)} · {formatMoney(payment.amount, payment.currency)}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="flex max-h-[70vh] items-center justify-center overflow-y-auto bg-slate-50 p-4">
-          {isImage ? (
-            <img
-              src={inlineUrl}
-              alt={payment.evidenceOriginalName || 'Comprobante de pago'}
-              className="max-h-[60vh] w-auto rounded-2xl object-contain shadow-xs"
-            />
-          ) : (
-            <div className="py-8 text-center">
-              <FileText size={48} className="mx-auto text-slate-400" />
-              <p className="mt-2 font-medium text-slate-800">
-                {payment.evidenceOriginalName || 'Documento adjunto'}
+            {!payments.length && (
+              <p className="mt-4 text-sm text-muted-foreground">
+                Aún no hay movimientos.
               </p>
-              <a
-                href={payment.evidenceUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
-              >
-                <ExternalLink size={14} />
-                <span>Abrir archivo en nueva pestaña</span>
-              </a>
+            )}
+            <p className="mt-4 text-xs text-muted-foreground">
+              Los importes se muestran en su moneda original.
+            </p>
+          </section>
+          <section className="border-b py-6">
+            <h2 className="font-semibold">¿Cómo reporto un pago?</h2>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Transfiere a una cuenta publicada y adjunta tu comprobante en la
+              cuota correspondiente.
+            </p>
+            <p className="mt-3 text-sm text-muted-foreground">
+              El equipo revisará el reporte antes de confirmar el abono.
+            </p>
+            <button
+              className={`${button} mt-4 w-full`}
+              onClick={() => setAccounts(true)}
+            >
+              Ver cuentas disponibles
+            </button>
+            <Link
+              href="/client/help"
+              className="mt-4 block text-sm text-brand-primary underline underline-offset-4"
+            >
+              Tengo una consulta sobre un pago
+            </Link>
+          </section>
+          {fiscalInformation}
+        </aside>
+      </div>
+      <Sheet open={accounts} onOpenChange={setAccounts}>
+        <SheetContent className="overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Cuentas de pago</SheetTitle>
+            <SheetDescription>
+              Consulta las cuentas oficiales y verifica la moneda antes de
+              transferir.
+            </SheetDescription>
+          </SheetHeader>
+          <PaymentMethodsGuide
+            channels={channels}
+            instructions={instructions}
+            expanded
+          />
+        </SheetContent>
+      </Sheet>
+      <Sheet
+        open={Boolean(detail)}
+        onOpenChange={(open) => {
+          if (!open) setDetail(null);
+        }}
+      >
+        <SheetContent className="overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Detalle de la cuota</SheetTitle>
+            <SheetDescription>
+              {detail?.project?.name || "Pago general"}
+            </SheetDescription>
+          </SheetHeader>
+          {detail && (
+            <div className="space-y-5">
+              <span className="text-sm text-muted-foreground">
+                {paymentStatus[detail.status]}
+              </span>
+              <h3 className="text-xl font-semibold">{detail.concept}</h3>
+              <p className="text-2xl font-semibold tabular-nums">
+                {formatMoney(detail.amount, detail.currency)}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {condition(detail)}
+              </p>
+              {detail.status === "SCHEDULED" && (
+                <p className="border-y py-5 text-sm">
+                  Esta cuota todavía no se puede reportar. Cuando se habilite,
+                  aparecerá la opción para adjuntar tu comprobante.
+                </p>
+              )}
+              {detail.reviewNotes && (
+                <p className="whitespace-pre-wrap text-sm">
+                  Observaciones: {detail.reviewNotes}
+                </p>
+              )}
+              {detail.transactionReference && (
+                <p className="break-words text-sm">
+                  N.º de operación: {detail.transactionReference}
+                </p>
+              )}
+              {detail.evidenceUrl && (
+                <div className="space-y-3">
+                  {detail.evidenceMimeType?.startsWith("image/") && (
+                    <img
+                      src={`${detail.evidenceUrl}?inline=1`}
+                      alt={detail.evidenceOriginalName || "Comprobante de pago"}
+                      className="max-h-96 w-full object-contain"
+                    />
+                  )}
+                  <a
+                    href={detail.evidenceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block break-words text-sm text-brand-primary underline underline-offset-4"
+                  >
+                    Abrir comprobante:{" "}
+                    {detail.evidenceOriginalName || "Archivo adjunto"}
+                  </a>
+                </div>
+              )}
+              {groups[0].statuses.includes(detail.status) && (
+                <button className={primary} onClick={() => startReport(detail)}>
+                  Reportar pago
+                </button>
+              )}
+              {detail.status === "UNDER_REVIEW" && (
+                <button className={button} onClick={() => startReport(detail)}>
+                  Actualizar comprobante
+                </button>
+              )}
             </div>
           )}
-        </div>
-
-        <div className="flex items-center justify-between border-t border-slate-100 p-4">
-          <a
-            href={payment.evidenceUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-1 text-xs font-semibold text-orange-600 hover:text-orange-700"
-          >
-            <ExternalLink size={14} />
-            <span>Descargar comprobante</span>
-          </a>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200"
-          >
-            Cerrar
-          </button>
-        </div>
-      </div>
+        </SheetContent>
+      </Sheet>
+      {report && (
+        <ClientReportPaymentModal
+          payment={report}
+          channels={channels}
+          isOpen
+          onClose={() => setReport(null)}
+        />
+      )}
     </div>
   );
 }

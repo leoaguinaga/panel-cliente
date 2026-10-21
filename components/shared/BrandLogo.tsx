@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
  * `tone="light"` invierte el isotipo para fondos oscuros.
  */
 export function BrandLogo({
-  tone = "dark",
+  tone = "light",
   className,
 }: {
   tone?: "dark" | "light"

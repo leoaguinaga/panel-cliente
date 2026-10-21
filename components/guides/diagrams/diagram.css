@@ -1,0 +1,58 @@
+/* Diagramas de las guías. Mismo lenguaje que las propuestas HTML de docs/. */
+.dg {
+  --dg-box: #252528;
+  --dg-line: #46464c;
+  --dg-edge: #6a6a70;
+  --dg-ink: var(--foreground);
+  --dg-muted: var(--muted-foreground);
+  --dg-brand: #ee4d31;
+  --dg-brand-soft: #ff9b85;
+  --dg-ok: #5fc48a;
+  --dg-info: #7aa7ff;
+  --dg-band: #1b1b1e;
+}
+
+.dg svg { display: block; width: 100%; height: auto; font-family: var(--font-sans); }
+
+/* Cajas */
+.dg-box { fill: var(--dg-box); stroke: var(--dg-line); stroke-width: 1.2; }
+.dg-node.is-dashed .dg-box { stroke-dasharray: 4 4; }
+.dg-brand .dg-box { fill: #2c2523; stroke: var(--dg-brand); stroke-width: 1.4; }
+.dg-ok .dg-box { fill: #1c2b22; stroke: #3f7a58; }
+.dg-warn .dg-box { fill: #2e2817; stroke: #7a6430; }
+.dg-info .dg-box { fill: #1d2333; stroke: #3d5384; }
+
+.dg-t { fill: var(--dg-ink); font-size: 13px; font-weight: 600; }
+.dg-s { fill: var(--dg-muted); font-size: 11.5px; font-weight: 500; }
+.dg-brand .dg-s { fill: var(--dg-brand-soft); font-weight: 700; }
+.dg-node a:hover .dg-box { stroke: var(--dg-ink); }
+.dg-node a { cursor: pointer; }
+
+.dg-badge { fill: #3a2420; stroke: var(--dg-brand); stroke-width: 1; }
+.dg-badge-t { fill: var(--dg-brand-soft); font-size: 11px; font-weight: 700; }
+
+/* Flechas */
+.dg-edge path { fill: none; stroke: var(--dg-edge); stroke-width: 1.4; }
+.dg-edge .dg-head { fill: var(--dg-edge); stroke: none; }
+.dg-edge.is-dashed path { stroke-dasharray: 4 4; stroke-width: 1.2; }
+.dg-edge.is-problem path { stroke: var(--dg-brand); stroke-width: 1.5; stroke-dasharray: 5 5; }
+.dg-edge.is-problem .dg-head { fill: var(--dg-brand); }
+.dg-edge.is-ok path { stroke: var(--dg-ok); stroke-width: 1.5; }
+.dg-edge.is-ok .dg-head { fill: var(--dg-ok); }
+.dg-edge-t { fill: var(--dg-muted); font-size: 11.5px; font-weight: 500; paint-order: stroke; stroke: var(--card); stroke-width: 4px; stroke-linejoin: round; }
+.dg-edge.is-problem .dg-edge-t { fill: var(--dg-brand-soft); font-weight: 700; }
+
+/* Textos sueltos: disparadores, notas, carriles */
+.dg-note { fill: var(--dg-muted); font-size: 11.5px; font-weight: 500; }
+.dg-lane { fill: var(--dg-band); stroke: var(--border); stroke-width: 1; }
+.dg-lane-t { fill: var(--dg-muted); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+.dg-group { fill: none; stroke: var(--dg-info); stroke-width: 1.3; stroke-dasharray: 6 4; }
+.dg-group-t { fill: var(--dg-info); font-size: 11.5px; font-weight: 700; }
+
+/* Resaltado al pasar el mouse: lo que no está conectado se atenúa */
+.dg [data-node], .dg [data-edge] { transition: opacity 150ms ease-out; }
+.dg.is-hovering [data-node]:not(.is-on),
+.dg.is-hovering [data-edge]:not(.is-on) { opacity: .28; }
+@media (prefers-reduced-motion: reduce) {
+  .dg [data-node], .dg [data-edge] { transition: none; }
+}

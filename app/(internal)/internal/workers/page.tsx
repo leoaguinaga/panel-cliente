@@ -1,11 +1,30 @@
-import { requireAuth } from '@/src/lib/auth';
-import { getWorkers } from '@/src/modules/users/server/queries';
-import { createWorkerAction, updateWorkerAction } from '@/src/modules/users/server/actions';
-import { ActionForm } from '@/components/shared/ActionForm';
-import { StatusBadge } from '@/components/shared/StatusBadge';
-const input = 'mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm';
+import { requireAuth } from "@/src/lib/auth";
+import { getWorkers } from "@/src/modules/users/server/queries";
+import { WorkerDirectory } from "@/src/modules/users/WorkerDirectory";
+import { WorkerCreateSheet } from "@/src/modules/users/WorkerCreateSheet";
+import styles from "@/src/modules/users/workers.module.css";
+
 export default async function WorkersPage() {
- await requireAuth(['ADMIN']);
- const workers = await getWorkers();
- return <section className="space-y-6"><header><h1 className="text-3xl font-semibold">Trabajadores</h1><p className="mt-2 text-muted-foreground">Gestiona datos, acceso y carga del equipo.</p></header><details className="rounded-xl border p-5"><summary className="cursor-pointer font-medium">Crear trabajador</summary><ActionForm action={createWorkerAction} className="mt-4 grid gap-4 text-sm sm:grid-cols-2"><label>Nombre<input name="name" required className={input} /></label><label>Correo<input name="email" type="email" required className={input} /></label><label>Contraseña inicial<input name="password" type="password" autoComplete="new-password" required minLength={10} className={input} /></label><label>Teléfono<input name="phone" type="tel" className={input} /></label><label>Rol<select name="role" className={input}><option value="WORKER">Colaborador</option><option value="ADMIN">Administrador</option></select></label><button className="w-fit self-end rounded-md bg-foreground px-4 py-2 text-background">Crear trabajador</button></ActionForm></details>{workers.map(worker => <article key={worker.id} className="space-y-3 rounded-xl border p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-medium">{worker.name}</h2><p className="text-sm text-muted-foreground">{worker.email}</p></div><StatusBadge status={worker.status} /></div><p className="text-sm text-muted-foreground">{worker._count.assignedProjects} proyectos · {worker._count.assignedTasks} tareas · {worker.role}</p><details><summary className="cursor-pointer text-sm font-medium">Editar trabajador</summary><ActionForm action={updateWorkerAction.bind(null, worker.id)} className="mt-4 grid gap-4 text-sm sm:grid-cols-2"><label>Nombre<input name="name" required defaultValue={worker.name} className={input} /></label><label>Teléfono<input name="phone" type="tel" defaultValue={worker.phone || ''} className={input} /></label><label>Rol<select name="role" defaultValue={worker.role} className={input}><option value="WORKER">Colaborador</option><option value="ADMIN">Administrador</option></select></label><label>Estado<select name="status" defaultValue={worker.status} className={input}><option value="ACTIVE">Activo</option><option value="INACTIVE">Inactivo</option></select></label><button className="w-fit rounded-md border px-4 py-2">Guardar trabajador</button></ActionForm></details></article>)}</section>;
+  await requireAuth(["ADMIN"]);
+  const workers = await getWorkers();
+  return (
+    <section className={styles.workspace}>
+      <header className={styles.pageHeader}>
+        <div>
+          <h1>Trabajadores</h1>
+          <p>Personas, acceso y trabajo del equipo, en un solo lugar.</p>
+        </div>
+        <div className={styles.teamSummary}>
+          <span>
+            {workers.filter((w) => w.status === "ACTIVE").length} activos
+          </span>
+          <span>
+            {workers.filter((w) => w.role === "ADMIN").length} administradores
+          </span>
+        </div>
+      </header>
+      <WorkerCreateSheet />
+      <WorkerDirectory workers={workers} />
+    </section>
+  );
 }

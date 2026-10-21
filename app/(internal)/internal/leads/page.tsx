@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { getLeads, getWorkers } from "@/src/modules/leads/server/queries";
+import { getCatalogs } from "@/src/modules/products/server/queries";
+import { getActiveWorkspace } from "@/src/modules/workspaces/server/workspace";
 import { CreateLeadSheet } from "@/components/internal/CreateSheets";
 import { LeadKanban } from "@/components/kanban/LeadKanban";
 import {
@@ -27,6 +29,7 @@ export default async function LeadsPage({
     priority?: string;
     zone?: string;
     q?: string;
+    lead?: string;
   }>;
 }) {
   const {
@@ -36,12 +39,17 @@ export default async function LeadsPage({
     priority,
     zone,
     q,
+    lead,
   } = await searchParams;
 
-  const [leads, workers] = await Promise.all([
+  const [leads, workers, products, workspace] = await Promise.all([
     getLeads({ status, type, priority, zone, q }).catch(() => []),
     getWorkers().catch(() => []),
+    getCatalogs().then((catalogs) => catalogs.products.map(({ id, name }) => ({ id, name }))).catch(() => []),
+    getActiveWorkspace(),
   ]);
+  // Un lead nuevo nace en el espacio activo.
+  const defaultProductId = products.some((product) => product.id === workspace) ? workspace : null;
 
   return (
     <div className="space-y-6">
@@ -67,7 +75,7 @@ export default async function LeadsPage({
               href={`/internal/leads?view=kanban${status ? `&status=${status}` : ""}${zone ? `&zone=${zone}` : ""}`}
               className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
                 view === "kanban"
-                  ? "bg-white text-slate-900 shadow-xs"
+                  ? "bg-card text-slate-900 shadow-xs"
                   : "text-slate-500 hover:text-slate-900"
               }`}
             >
@@ -78,7 +86,7 @@ export default async function LeadsPage({
               href={`/internal/leads?view=table${status ? `&status=${status}` : ""}${zone ? `&zone=${zone}` : ""}`}
               className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
                 view === "table"
-                  ? "bg-white text-slate-900 shadow-xs"
+                  ? "bg-card text-slate-900 shadow-xs"
                   : "text-slate-500 hover:text-slate-900"
               }`}
             >
@@ -87,17 +95,17 @@ export default async function LeadsPage({
             </Link>
           </div>
 
-          <CreateLeadSheet workers={workers} />
+          <CreateLeadSheet workers={workers} products={products} defaultProductId={defaultProductId} />
         </div>
       </div>
 
       {/* Main View Area */}
       {view === "kanban" ? (
-        <LeadKanban initialLeads={leads} workers={workers} />
+        <LeadKanban initialLeads={leads} workers={workers} products={products} initialLeadId={lead} />
       ) : (
         <div className="space-y-4">
           {/* Table View */}
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+          <div className="bg-card border border-slate-200 rounded-xl overflow-hidden shadow-xs">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-200">
                 <thead className="bg-slate-50">
@@ -125,7 +133,7 @@ export default async function LeadsPage({
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-slate-200">
+                <tbody className="bg-card divide-y divide-slate-200">
                   {leads.length === 0 ? (
                     <tr>
                       <td

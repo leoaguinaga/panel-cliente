@@ -4,6 +4,11 @@ import { useState, useTransition } from 'react';
 import { createSprintAction, updateSprintAction, deleteSprintAction } from '@/src/modules/projects/server/actions';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader,
+  AlertDialogTitle, AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Plus, Calendar, Layers, CheckCircle2, PlayCircle, Clock, Trash2, Edit2 } from 'lucide-react';
 import type { ProjectSprint, ProjectTask } from '@/src/modules/projects/types';
 import { formatDate } from '@/lib/formatters';
@@ -66,7 +71,6 @@ export function SprintManager({
   };
 
   const handleDelete = (sprintId: string) => {
-    if (!confirm('¿Seguro que deseas eliminar este Sprint? Las tareas asociadas pasarán al Backlog.')) return;
     startTransition(async () => {
       setMessage(null); setError(null);
       try { await deleteSprintAction(projectId, sprintId); setMessage('Sprint eliminado. Las tareas asociadas pasaron al backlog.'); }
@@ -93,7 +97,7 @@ export function SprintManager({
         <Button
           onClick={() => setModalOpen(true)}
           size="sm"
-          className="bg-slate-900 hover:bg-black text-white text-xs gap-1.5"
+          className="bg-brand-button hover:bg-brand-hover text-white text-xs gap-1.5"
         >
           <Plus className="w-3.5 h-3.5" />
           Crear Sprint
@@ -101,7 +105,7 @@ export function SprintManager({
       </div>
 
       {sprints.length === 0 ? (
-        <div className="p-10 border rounded-xl bg-white text-center space-y-3">
+        <div className="p-10 border rounded-xl bg-card text-center space-y-3">
           <Layers className="w-8 h-8 text-slate-400 mx-auto" />
           <p className="text-sm font-semibold text-slate-800">No hay Sprints configurados</p>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
@@ -121,7 +125,7 @@ export function SprintManager({
             return (
               <div
                 key={sprint.id}
-                className={`rounded-xl border bg-white p-5 shadow-xs space-y-4 flex flex-col justify-between transition-all ${
+                className={`rounded-xl border bg-card p-5 shadow-xs space-y-4 flex flex-col justify-between transition-all ${
                   sprint.status === 'ACTIVE'
                     ? 'border-blue-500 ring-1 ring-blue-500/30'
                     : 'border-slate-200'
@@ -205,21 +209,44 @@ export function SprintManager({
                     )}
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(sprint.id)}
-                    className="text-slate-400 hover:text-red-600 p-1 transition-colors"
-                    title="Eliminar Sprint"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        className="text-slate-400 hover:text-red-600 p-1 transition-colors disabled:opacity-50"
+                        title="Eliminar Sprint"
+                        aria-label={`Eliminar sprint ${sprint.name}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>¿Eliminar sprint?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Se eliminará el sprint “{sprint.name}”. Las tareas asociadas pasarán al backlog.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                          variant="destructive"
+                          disabled={isPending}
+                          onClick={() => handleDelete(sprint.id)}
+                        >
+                          Eliminar sprint
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
                 <details className="rounded-lg bg-slate-50 p-3">
                   <summary className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-slate-600"><Edit2 className="size-3.5" />Editar sprint</summary>
                   <form action={handleEdit.bind(null, sprint)} className="mt-3 space-y-3">
-                    <label className="block text-xs font-medium text-slate-600">Nombre<input required name="name" defaultValue={sprint.name} className="mt-1 min-h-10 w-full rounded-lg border bg-white px-3 text-xs" /></label>
-                    <label className="block text-xs font-medium text-slate-600">Objetivo<textarea name="goal" rows={2} defaultValue={sprint.goal || ''} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 text-xs" /></label>
-                    <div className="grid grid-cols-2 gap-2"><label className="text-xs font-medium text-slate-600">Inicio<input name="startDate" type="date" defaultValue={sprint.startDate?.slice(0,10) || ''} className="mt-1 min-h-10 w-full rounded-lg border bg-white px-2 text-xs" /></label><label className="text-xs font-medium text-slate-600">Fin<input name="endDate" type="date" defaultValue={sprint.endDate?.slice(0,10) || ''} className="mt-1 min-h-10 w-full rounded-lg border bg-white px-2 text-xs" /></label></div>
+                    <label className="block text-xs font-medium text-slate-600">Nombre<input required name="name" defaultValue={sprint.name} className="mt-1 min-h-10 w-full rounded-lg border bg-card px-3 text-xs" /></label>
+                    <label className="block text-xs font-medium text-slate-600">Objetivo<textarea name="goal" rows={2} defaultValue={sprint.goal || ''} className="mt-1 w-full rounded-lg border bg-card px-3 py-2 text-xs" /></label>
+                    <div className="grid grid-cols-2 gap-2"><label className="text-xs font-medium text-slate-600">Inicio<input name="startDate" type="date" defaultValue={sprint.startDate?.slice(0,10) || ''} className="mt-1 min-h-10 w-full rounded-lg border bg-card px-2 text-xs" /></label><label className="text-xs font-medium text-slate-600">Fin<input name="endDate" type="date" defaultValue={sprint.endDate?.slice(0,10) || ''} className="mt-1 min-h-10 w-full rounded-lg border bg-card px-2 text-xs" /></label></div>
                     <input type="hidden" name="status" value={sprint.status} />
                     <Button disabled={isPending} size="sm" className="w-full">{isPending ? 'Guardando…' : 'Guardar cambios'}</Button>
                   </form>
@@ -233,7 +260,7 @@ export function SprintManager({
       {/* Modal Creación Sprint */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl border bg-white p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+          <div className="w-full max-w-md rounded-xl border bg-card p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between border-b pb-2">
               <h3 className="font-bold text-sm text-slate-900">Crear Nuevo Sprint</h3>
               <button
@@ -253,7 +280,7 @@ export function SprintManager({
                   placeholder="Ej. Sprint 2: Catálogo y Carrito de Compras"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full rounded-md border bg-slate-50 px-3 py-2 text-xs outline-none focus:bg-white focus:ring-2 focus:ring-primary"
+                  className="w-full rounded-md border bg-slate-50 px-3 py-2 text-xs outline-none focus:bg-card focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -264,7 +291,7 @@ export function SprintManager({
                   placeholder="¿Qué valor entregable logrará el equipo en esta iteración?"
                   value={goal}
                   onChange={(e) => setGoal(e.target.value)}
-                  className="w-full rounded-md border bg-slate-50 px-3 py-2 text-xs outline-none focus:bg-white focus:ring-2 focus:ring-primary"
+                  className="w-full rounded-md border bg-slate-50 px-3 py-2 text-xs outline-none focus:bg-card focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -275,7 +302,7 @@ export function SprintManager({
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full rounded-md border bg-slate-50 px-2.5 py-1.5 text-xs outline-none focus:bg-white focus:ring-2 focus:ring-primary"
+                    className="w-full rounded-md border bg-slate-50 px-2.5 py-1.5 text-xs outline-none focus:bg-card focus:ring-2 focus:ring-primary"
                   />
                 </div>
                 <div>
@@ -284,7 +311,7 @@ export function SprintManager({
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full rounded-md border bg-slate-50 px-2.5 py-1.5 text-xs outline-none focus:bg-white focus:ring-2 focus:ring-primary"
+                    className="w-full rounded-md border bg-slate-50 px-2.5 py-1.5 text-xs outline-none focus:bg-card focus:ring-2 focus:ring-primary"
                   />
                 </div>
               </div>
@@ -293,7 +320,7 @@ export function SprintManager({
                 <Button type="button" variant="outline" size="sm" onClick={() => setModalOpen(false)}>
                   Cancelar
                 </Button>
-                <Button disabled={isPending} type="submit" size="sm" className="bg-slate-900 hover:bg-black text-white">
+                <Button disabled={isPending} type="submit" size="sm" className="bg-brand-button hover:bg-brand-hover text-white">
                   {isPending ? 'Creando...' : 'Crear Sprint'}
                 </Button>
               </div>

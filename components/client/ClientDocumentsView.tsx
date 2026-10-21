@@ -68,7 +68,7 @@ export function ClientDocumentsView({
 
   if (documents.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+      <div className="rounded-2xl border border-dashed border-slate-300 bg-card p-10 text-center">
         <FileText className="mx-auto mb-4 text-slate-400" />
         <h2 className="font-semibold text-slate-900">No hay documentos disponibles</h2>
         <p className="mt-2 text-sm text-slate-600">
@@ -80,7 +80,7 @@ export function ClientDocumentsView({
 
   return (
     <>
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-card shadow-xs">
         <div className="hidden grid-cols-[1fr_180px_120px_110px] gap-4 border-b border-slate-200 bg-slate-50 px-5 py-3 text-xs font-semibold text-slate-500 sm:grid">
           <span>Documento</span>
           <span>Tipo</span>

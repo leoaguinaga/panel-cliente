@@ -1,626 +1,274 @@
 'use client';
 
 import { useEffect, useState, useTransition } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { updateTaskStatusAction, updateTaskDetailsAction, createTaskAction } from '@/src/modules/projects/server/actions';
+import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Calendar, Eye, ListChecks, Lock, MessageSquare, Plus } from 'lucide-react';
+import { KanbanAvatar, KanbanCard, KanbanColumn, KanbanScroller, useKanbanDrag } from './KanbanBoard';
+import { cn } from '@/lib/utils';
 import { EvidenceModal, TaskEvidenceItem } from '../agile/EvidenceUploader';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useHorizontalDragScroll } from '@/hooks/use-horizontal-drag-scroll';
-import type { ProjectRequirement, ProjectSprint, ProjectTask, ProjectWorker } from '@/src/modules/projects/types';
-import { TaskDependencyEditor } from '@/components/projects/TaskDependencyEditor';
-import { formatCompactDate, formatProjectPriority, formatTaskStatus } from '@/lib/formatters';
-import {
-  Camera,
-  Calendar,
-  Plus,
-  Filter,
-  Layers,
-  Sparkles,
-  CheckCircle2,
-  GripVertical,
-} from 'lucide-react';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { formatCompactDate, formatProjectPriority, formatTaskStatus, taskCode } from '@/lib/formatters';
+import { createTaskQuickAction, setTaskStatusAction } from '@/src/modules/projects/server/task-actions';
+import type { ProjectMilestone, ProjectRequirement, ProjectSprint, ProjectTask, ProjectWorker } from '@/src/modules/projects/types';
 
 export type TaskItem = Omit<ProjectTask, 'evidences'> & { evidences?: TaskEvidenceItem[] };
 
-const COLUMNS: Array<{
-  id: TaskItem['status'];
-  title: string;
-  dotColor: string;
-  columnBg: string;
-  headerColor: string;
-}> = [
-  {
-    id: 'TODO',
-    title: 'Por hacer',
-    dotColor: 'bg-indigo-600',
-    columnBg: 'bg-[#F6F7FB] border-slate-200/70',
-    headerColor: 'text-slate-700',
-  },
-  {
-    id: 'IN_PROGRESS',
-    title: 'En progreso',
-    dotColor: 'bg-blue-600',
-    columnBg: 'bg-[#F0F6FF] border-blue-100/70',
-    headerColor: 'text-slate-700',
-  },
-  {
-    id: 'REVIEW',
-    title: 'En revisión',
-    dotColor: 'bg-amber-500',
-    columnBg: 'bg-[#FFF9F2] border-amber-100/70',
-    headerColor: 'text-slate-700',
-  },
-  {
-    id: 'BLOCKED',
-    title: 'Bloqueada',
-    dotColor: 'bg-rose-500',
-    columnBg: 'bg-[#FFF2F4] border-rose-100/70',
-    headerColor: 'text-slate-700',
-  },
-  {
-    id: 'DONE',
-    title: 'Terminada',
-    dotColor: 'bg-emerald-500',
-    columnBg: 'bg-[#F2FAF5] border-emerald-100/70',
-    headerColor: 'text-slate-700',
-  },
+/** Bloqueada no es una columna: la tarjeta se queda en la de su estado previo, con su marca. */
+const COLUMNS: Array<{ id: Exclude<TaskItem['status'], 'BLOCKED'>; title: string; dot: string }> = [
+  { id: 'TODO', title: 'Por hacer', dot: 'bg-muted-foreground' },
+  { id: 'IN_PROGRESS', title: 'En progreso', dot: 'bg-sky-400' },
+  { id: 'REVIEW', title: 'En revisión', dot: 'bg-violet-400' },
+  { id: 'DONE', title: 'Terminada', dot: 'bg-emerald-400' },
 ];
+const columnOf = (task: Pick<TaskItem, 'status' | 'blockedFromStatus'>) => (task.status === 'BLOCKED' ? (task.blockedFromStatus ?? 'IN_PROGRESS') : task.status);
+const STALE_DAYS = 3;
+const daysSince = (date?: string) => (date ? Math.max(0, Math.floor((Date.now() - new Date(date).getTime()) / 86400000)) : 0);
+
+const field = 'mt-1 block h-9 w-full rounded-lg border bg-background px-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
 export function TaskKanban({
   projectId,
   initialTasks,
+  usesSprints = false,
   sprints = [],
   requirements = [],
+  milestones = [],
   workers = [],
 }: {
   projectId: string;
   initialTasks: TaskItem[];
+  usesSprints?: boolean;
   sprints?: ProjectSprint[];
   requirements?: ProjectRequirement[];
+  milestones?: ProjectMilestone[];
   workers?: ProjectWorker[];
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [tasks, setTasks] = useState<TaskItem[]>(initialTasks);
   const [syncedTasks, setSyncedTasks] = useState(initialTasks);
   if (syncedTasks !== initialTasks) {
     setSyncedTasks(initialTasks);
     setTasks(initialTasks);
   }
-  const focusedTaskId = useSearchParams().get('task');
-  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
-  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
+  const focusedTaskId = searchParams.get('task');
+  const [boardError, setBoardError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const { containerRef, headerProps, onKeyDown: handleBoardKeyDown } = useHorizontalDragScroll();
-
-  // Filters
   const [selectedSprintId, setSelectedSprintId] = useState<string>('ALL');
   const [selectedWorkerId, setSelectedWorkerId] = useState<string>('ALL');
-
-  // Evidence Modal State
   const [evidenceModalTask, setEvidenceModalTask] = useState<TaskItem | null>(null);
+  const [newTaskStatus, setNewTaskStatus] = useState<TaskItem['status'] | null>(null);
+  const [newTaskError, setNewTaskError] = useState<string | null>(null);
 
-  // New Task Quick Modal
-  const [newTaskOpen, setNewTaskOpen] = useState(false);
-  const [newTaskStatus, setNewTaskStatus] = useState<TaskItem['status']>('TODO');
-  const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [newTaskPriority, setNewTaskPriority] = useState('MEDIUM');
-  const [newTaskSprintId, setNewTaskSprintId] = useState(sprints.find((s) => s.status === 'ACTIVE')?.id || '');
-  const [newTaskReqId, setNewTaskReqId] = useState('');
-  const [newTaskWorkerId, setNewTaskWorkerId] = useState('');
-  const [newTaskStartDate, setNewTaskStartDate] = useState('');
-  const [newTaskEndDate, setNewTaskEndDate] = useState('');
-
+  // Deep link (?task=): bring the card (or its parent) into view behind the drawer.
   useEffect(() => {
     if (!focusedTaskId) return;
-    const card = document.getElementById(`task-${focusedTaskId}`);
-    if (!card) return;
-    card.scrollIntoView({ block: 'center', inline: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
-    card.focus({ preventScroll: true });
-  }, [focusedTaskId]);
+    const target = tasks.find((task) => task.id === focusedTaskId);
+    const card = document.getElementById(`task-${target?.parentId || focusedTaskId}`);
+    card?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  }, [focusedTaskId, tasks]);
 
-  // Drag handlers
-  const handleDragStart = (e: React.DragEvent, id: string) => {
-    e.dataTransfer.setData('text/plain', id);
-    setDraggedTaskId(id);
+  const taskHref = (taskId: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('task', taskId);
+    return `${pathname}?${params.toString()}`;
   };
 
-  const handleDragOver = (e: React.DragEvent, columnId: string) => {
-    e.preventDefault();
-    if (dragOverColumn !== columnId) setDragOverColumn(columnId);
-  };
-
-  const handleDragLeave = () => {
-    setDragOverColumn(null);
-  };
-
-  const handleDrop = (e: React.DragEvent, targetStatus: TaskItem['status']) => {
-    e.preventDefault();
-    setDragOverColumn(null);
-    const taskId = e.dataTransfer.getData('text/plain') || draggedTaskId;
-    if (!taskId) return;
-
-    const task = tasks.find((t) => t.id === taskId);
-    if (!task || task.status === targetStatus) {
-      setDraggedTaskId(null);
+  const moveTask = (task: TaskItem, targetStatus: TaskItem['status']) => {
+    if (columnOf(task) === targetStatus) return;
+    setBoardError(null);
+    if (targetStatus === 'REVIEW' && !task.reviewer) {
+      setBoardError(`${taskCode(task.number)} necesita un revisor antes de pasar a revisión. Asígnalo en el detalle de la tarea.`);
+      router.replace(taskHref(task.id), { scroll: false });
       return;
     }
-
-    // Optimistic UI update
-    setTasks((prev) =>
-      prev.map((item) => (item.id === taskId ? { ...item, status: targetStatus } : item))
-    );
-    setDraggedTaskId(null);
-
-    // If dropped into REVIEW, prompt screenshot evidence modal
-    if (targetStatus === 'REVIEW') {
-      setEvidenceModalTask({ ...task, status: 'REVIEW' });
-    }
-
-    // Server update
+    const previous = tasks;
+    setTasks((items) => items.map((item) => (item.id === task.id ? { ...item, status: targetStatus, blockedFromStatus: null, statusChangedAt: new Date().toISOString() } : item)));
+    if (targetStatus === 'REVIEW') setEvidenceModalTask({ ...task, status: 'REVIEW' });
     startTransition(async () => {
-      try {
-        await updateTaskStatusAction(taskId, projectId, targetStatus);
-      } catch {
-        setTasks(initialTasks);
+      const result = await setTaskStatusAction(projectId, task.id, targetStatus);
+      if (!result.ok) {
+        setTasks(previous);
+        setBoardError(`${taskCode(task.number)}: ${result.error}`);
       }
     });
   };
 
-  const moveTask = (task: TaskItem, targetStatus: TaskItem['status']) => {
-    if (task.status === targetStatus) return;
-    const previous = tasks;
-    setTasks((items) => items.map((item) => item.id === task.id ? { ...item, status: targetStatus } : item));
+  const { dragged, dropTarget, dragProps, dropProps } = useKanbanDrag(tasks, (task, target) => moveTask(task, target as TaskItem['status']));
+
+  const handleCreateTask = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const value = (key: string) => String(data.get(key) || '').trim() || null;
+    const title = value('title');
+    if (!title) return;
+    const estimate = value('estimateHours');
     startTransition(async () => {
-      try { await updateTaskStatusAction(task.id, projectId, targetStatus); }
-      catch { setTasks(previous); }
+      setNewTaskError(null);
+      const result = await createTaskQuickAction(projectId, {
+        title,
+        status: newTaskStatus || 'TODO',
+        priority: value('priority') || 'MEDIUM',
+        assignedToId: value('assignedToId'),
+        reviewerId: value('reviewerId'),
+        sprintId: value('sprintId'),
+        milestoneId: value('milestoneId'),
+        requirementId: value('requirementId'),
+        plannedStartDate: value('plannedStartDate'),
+        dueDate: value('dueDate'),
+        estimateHours: estimate ? Number(estimate) : null,
+      });
+      if (!result.ok) {
+        setNewTaskError(result.error);
+        return;
+      }
+      setNewTaskStatus(null);
     });
   };
 
-  const handleCreateTask = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTaskTitle.trim()) return;
-
-    const formData = new FormData();
-    formData.append('title', newTaskTitle.trim());
-    formData.append('priority', newTaskPriority);
-    formData.append('status', newTaskStatus);
-    if (newTaskSprintId) formData.append('sprintId', newTaskSprintId);
-    if (newTaskReqId) formData.append('requirementId', newTaskReqId);
-    if (newTaskWorkerId) formData.append('assignedToId', newTaskWorkerId);
-    if (newTaskStartDate) formData.append('plannedStartDate', newTaskStartDate);
-    if (newTaskEndDate) formData.append('plannedEndDate', newTaskEndDate);
-
-    startTransition(async () => {
-      await createTaskAction(projectId, formData);
-      setNewTaskTitle('');
-      setNewTaskOpen(false);
-    });
-  };
-
-  // Filter tasks
-  const filteredTasks = tasks.filter((t) => {
-    if (selectedSprintId === 'BACKLOG' && t.sprint?.id) return false;
-    if (selectedSprintId !== 'ALL' && selectedSprintId !== 'BACKLOG' && t.sprint?.id !== selectedSprintId) return false;
-    if (selectedWorkerId !== 'ALL' && t.assignedTo?.id !== selectedWorkerId) return false;
+  // The board shows top-level work; subtasks live inside their task.
+  const filteredTasks = tasks.filter((task) => {
+    if (task.parentId) return false;
+    if (selectedSprintId === 'BACKLOG' && task.sprint?.id) return false;
+    if (selectedSprintId !== 'ALL' && selectedSprintId !== 'BACKLOG' && task.sprint?.id !== selectedSprintId) return false;
+    if (selectedWorkerId === 'UNASSIGNED' && task.assignedTo) return false;
+    if (!['ALL', 'UNASSIGNED'].includes(selectedWorkerId) && task.assignedTo?.id !== selectedWorkerId) return false;
     return true;
   });
-
-  const getPriorityPill = (priority: string) => {
-    switch (priority) {
-      case 'URGENT':
-        return (
-          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-100">
-            {formatProjectPriority('URGENT')}
-          </span>
-        );
-      case 'HIGH':
-        return (
-          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100">
-            {formatProjectPriority('HIGH')}
-          </span>
-        );
-      case 'LOW':
-        return (
-          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-sky-50 text-sky-600 border border-sky-100">
-            {formatProjectPriority('LOW')}
-          </span>
-        );
-      default:
-        return (
-          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-100">
-            {formatProjectPriority('MEDIUM')}
-          </span>
-        );
-    }
-  };
-
-  const getInitials = (name?: string) => {
-    if (!name) return 'UN';
-    const parts = name.trim().split(' ');
-    if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-    return name.slice(0, 2).toUpperCase();
-  };
+  const topLevelCount = tasks.filter((task) => !task.parentId).length;
+  const today = new Date().setHours(0, 0, 0, 0);
 
   return (
     <div className="space-y-3">
-      {/* Filters & Actions Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium mr-1">
-            <Filter className="w-3.5 h-3.5" />
-            Filtros:
-          </div>
-
-          {/* Sprint selector */}
-          <select
-            value={selectedSprintId}
-            onChange={(e) => setSelectedSprintId(e.target.value)}
-            className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-1.5 text-xs font-medium text-slate-700 outline-none focus:ring-2 focus:ring-primary focus:bg-white"
-          >
-            <option value="ALL">Todos los Sprints ({tasks.length})</option>
-            {sprints.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name} {s.status === 'ACTIVE' ? '★ (Activo)' : ''}
-              </option>
-            ))}
-            <option value="BACKLOG">Backlog (Sin Sprint)</option>
-          </select>
-
-          {/* Worker selector */}
-          <select
-            value={selectedWorkerId}
-            onChange={(e) => setSelectedWorkerId(e.target.value)}
-            className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-1.5 text-xs font-medium text-slate-700 outline-none focus:ring-2 focus:ring-primary focus:bg-white"
-          >
+          {usesSprints && <>
+            <label className="sr-only" htmlFor="board-sprint">Sprint</label>
+            <select id="board-sprint" value={selectedSprintId} onChange={(event) => setSelectedSprintId(event.target.value)} className="h-8 rounded-lg border bg-card px-2.5 text-[13px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <option value="ALL">Todos los sprints ({topLevelCount})</option>
+              {sprints.map((sprint) => <option key={sprint.id} value={sprint.id}>{sprint.name}{sprint.status === 'ACTIVE' ? ' (activo)' : ''}</option>)}
+              <option value="BACKLOG">Sin sprint</option>
+            </select>
+          </>}
+          <label className="sr-only" htmlFor="board-worker">Responsable</label>
+          <select id="board-worker" value={selectedWorkerId} onChange={(event) => setSelectedWorkerId(event.target.value)} className="h-8 rounded-lg border bg-card px-2.5 text-[13px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <option value="ALL">Todos los responsables</option>
-            {workers.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name}{w.role === 'ADMIN' ? ' (Administrador)' : ''}
-              </option>
-            ))}
+            <option value="UNASSIGNED">Sin responsable</option>
+            {workers.map((worker) => <option key={worker.id} value={worker.id}>{worker.name}</option>)}
           </select>
         </div>
-
-        <Button
-          onClick={() => {
-            setNewTaskStatus('TODO');
-            setNewTaskOpen(true);
-          }}
-          size="sm"
-          className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs gap-1.5 shadow-xs font-medium px-3.5"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Nueva Tarea
+        <Button onClick={() => setNewTaskStatus('TODO')} size="sm" className="gap-1.5">
+          <Plus aria-hidden="true" />
+          Nueva tarea
         </Button>
       </div>
 
-      {/* Board Columns: Natural standard width with horizontal scroll and Grip scroll */}
-      <div
-        ref={containerRef}
-        className="flex gap-4 overflow-x-auto overflow-y-hidden scroll-smooth pb-6 pt-1 select-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        style={{ msOverflowStyle: 'none' }}
-        tabIndex={0}
-        aria-label="Estados de las tareas. Usa las flechas izquierda y derecha para desplazarte."
-        onKeyDown={handleBoardKeyDown}
-      >
-        {COLUMNS.map((col) => {
-          const colTasks = filteredTasks.filter((t) => t.status === col.id);
-          const isOver = dragOverColumn === col.id;
-
-          return (
-            <div
-              key={col.id}
-              onDragOver={(e) => handleDragOver(e, col.id)}
-              onDragLeave={handleDragLeave}
-              onDrop={(e) => handleDrop(e, col.id)}
-              className={`shrink-0 w-80 rounded-2xl border p-4 flex flex-col min-h-[640px] transition-all ${
-                col.columnBg
-              } ${isOver ? 'ring-2 ring-blue-500/80 ring-offset-2 bg-white/95' : ''}`}
-            >
-              {/* Column Header */}
-              <div {...headerProps} className="flex items-center justify-between px-1 py-1 mb-2 cursor-grab active:cursor-grabbing touch-pan-y select-none" aria-label={`Arrastra para desplazarte desde ${col.title}`}>
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${col.dotColor}`} />
-                  <h3 className={`font-semibold text-xs truncate ${col.headerColor}`}>
-                    {col.title}
-                  </h3>
-                  <span className="text-xs font-normal text-slate-400 shrink-0">
-                    ({colTasks.length})
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-1">
-                  <span className="text-slate-400 p-1" aria-hidden="true">
-                    <GripVertical className="size-4" />
-                  </span>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNewTaskStatus(col.id);
-                      setNewTaskOpen(true);
-                    }}
-                    className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-black/5 transition-colors"
-                    title="Añadir tarea a esta columna"
-                  >
-                    <Plus className="size-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Cards Container */}
-              <div className="flex-1 space-y-3 overflow-y-auto pr-0.5">
-                {colTasks.length === 0 ? (
-                  <div className="h-32 border border-dashed border-slate-300/70 rounded-xl flex flex-col items-center justify-center text-center p-3 text-xs text-slate-400">
-                    Arrastra tareas aquí
-                  </div>
-                ) : (
-                  colTasks.map((task) => {
-                    const hasUnresolvedDependencies = Boolean(task.blockedBy?.some((dependency) => dependency.predecessor.status !== 'DONE'));
-
-                    return (
-                      <div
-                        key={task.id}
-                        id={`task-${task.id}`}
-                        tabIndex={-1}
-                        aria-current={focusedTaskId === task.id ? 'true' : undefined}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, task.id)}
-                        className={`group relative rounded-xl bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-md transition-all cursor-grab active:cursor-grabbing border border-slate-100 space-y-3 ${
-                          draggedTaskId === task.id ? 'opacity-40 scale-95' : ''
-                        } ${focusedTaskId === task.id ? 'ring-2 ring-blue-600 ring-offset-2' : ''} focus-visible:outline-none`}
-                      >
-                        {/* Top row: Priority Pill, 6-dots handle & Optional Req Tag + Menu */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <span className="text-slate-300 group-hover:text-slate-400 transition-colors shrink-0">
-                              <GripVertical className="size-3.5" />
-                            </span>
-                            {getPriorityPill(task.priority)}
-
-                            {task.requirement && (
-                              <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded-full truncate">
-                                {task.requirement.code || 'REQ'}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        <label className="block text-[11px] font-medium text-slate-500">Mover a
-                          <select value={task.status} onPointerDown={(event) => event.stopPropagation()} onDragStart={(event) => event.preventDefault()} onChange={(event) => moveTask(task, event.target.value as TaskItem['status'])} className="mt-1 min-h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-2 text-xs text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">
-                            {COLUMNS.map((status) => <option key={status.id} value={status.id} disabled={hasUnresolvedDependencies && !['TODO', 'BLOCKED'].includes(status.id)}>{status.title}</option>)}
-                          </select>
-                        </label>
-
-                        <details onPointerDown={(event) => event.stopPropagation()} onDragStart={(event) => { event.preventDefault(); event.stopPropagation(); }} className="rounded-lg border border-slate-100 bg-slate-50/70 p-2">
-                          <summary className="cursor-pointer text-[11px] font-semibold text-slate-600">Planificación</summary>
-                          <form action={updateTaskDetailsAction.bind(null, task.id, projectId)} className="mt-2 grid grid-cols-2 gap-2">
-                            <label className="text-[10px] font-medium text-slate-500">Inicio<input name="plannedStartDate" type="date" defaultValue={task.plannedStartDate?.slice(0, 10) || ''} className="mt-1 min-h-9 w-full rounded-md border bg-white px-2 text-[11px]" /></label>
-                            <label className="text-[10px] font-medium text-slate-500">Fin<input name="plannedEndDate" type="date" defaultValue={task.plannedEndDate?.slice(0, 10) || ''} className="mt-1 min-h-9 w-full rounded-md border bg-white px-2 text-[11px]" /></label>
-                            <input type="hidden" name="title" value={task.title} />
-                            <input type="hidden" name="description" value={task.description || ''} />
-                            <input type="hidden" name="priority" value={task.priority} />
-                            <input type="hidden" name="assignedToId" value={task.assignedTo?.id || ''} />
-                            <input type="hidden" name="sprintId" value={task.sprint?.id || ''} />
-                            <input type="hidden" name="requirementId" value={task.requirement?.id || ''} />
-                            <input type="hidden" name="dueDate" value={task.dueDate?.slice(0, 10) || ''} />
-                            <button className="col-span-2 min-h-9 rounded-md border bg-white text-[11px] font-semibold text-slate-700">Guardar fechas</button>
-                          </form>
-                        </details>
-
-                        <TaskDependencyEditor projectId={projectId} task={task} tasks={tasks} />
-
-                        {/* Title */}
-                        <h4
-                          className={`text-[13px] font-semibold text-slate-800 leading-snug line-clamp-2 ${
-                            task.status === 'DONE' ? 'line-through text-slate-400' : ''
-                          }`}
-                        >
-                          {task.title}
-                        </h4>
-
-                        {/* Bottom Row: Due date, evidence & assignee */}
-                        <div className="pt-2 border-t border-slate-100/80 flex items-center justify-between gap-2 text-xs text-slate-400">
-                          <div className="flex items-center gap-2 min-w-0">
-                            {(() => {
-                              const due = task.dueDate || task.plannedEndDate;
-                              if (!due) return null;
-                              const overdue = task.status !== 'DONE' && new Date(due).getTime() < new Date().setHours(0, 0, 0, 0);
-                              return (
-                                <span className={`inline-flex items-center gap-1 text-[11px] ${overdue ? 'font-semibold text-rose-700' : 'text-slate-500'}`}>
-                                  <Calendar className="size-3.5" aria-hidden="true" />
-                                  {overdue ? 'Venció ' : 'Vence '}{formatCompactDate(due)}
-                                </span>
-                              );
-                            })()}
-                            <button
-                              type="button"
-                              onClick={() => setEvidenceModalTask(task)}
-                              className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md transition-colors ${
-                                task.evidences && task.evidences.length > 0
-                                  ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 font-semibold'
-                                  : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
-                              }`}
-                              aria-label={`Evidencias de ${task.title}: ${task.evidences?.length || 0}`}
-                              title="Subir o ver capturas de evidencia"
-                            >
-                              <Camera className="size-3" aria-hidden="true" />
-                              <span>{task.evidences?.length || 0}</span>
-                            </button>
-                          </div>
-
-                          {/* Avatar Circle */}
-                          <div className="flex items-center -space-x-1.5 overflow-hidden">
-                            {task.assignedTo ? (
-                              <div
-                                className="w-6 h-6 rounded-full bg-slate-700 border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-xs"
-                                title={task.assignedTo.name}
-                                aria-label={`Responsable: ${task.assignedTo.name}`}
-                              >
-                                {getInitials(task.assignedTo.name)}
-                              </div>
-                            ) : (
-                              <span className="text-[11px] text-slate-400">Sin responsable</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          );
-        })}
+      <div aria-live="polite">
+        {boardError && (
+          <p role="alert" className="flex items-start justify-between gap-3 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+            {boardError}
+            <button type="button" onClick={() => setBoardError(null)} className="shrink-0 font-semibold underline-offset-2 hover:underline">Cerrar</button>
+          </p>
+        )}
       </div>
 
-      {/* Quick New Task Modal */}
-      {newTaskOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-2xl border bg-white p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
-                <Plus className="size-4 text-blue-600" />
-                Nueva tarea · {formatTaskStatus(newTaskStatus)}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setNewTaskOpen(false)}
-                className="text-slate-400 hover:text-slate-600 text-lg leading-none"
-              >
-                ✕
-              </button>
+      <KanbanScroller label="Tablero de tareas del proyecto" columns={COLUMNS.length} fit>
+        {COLUMNS.map((col) => {
+          const colTasks = filteredTasks.filter((task) => columnOf(task) === col.id);
+          return (
+            <KanbanColumn
+              key={col.id}
+              column={col}
+              count={colTasks.length}
+              highlighted={dropTarget === col.id}
+              dropProps={dropProps(col.id, col.id)}
+              onAdd={col.id === 'DONE' ? undefined : () => setNewTaskStatus(col.id)}
+              emptyLabel="Arrastra tareas aquí"
+            >
+              {colTasks.map((task) => {
+                const due = task.dueDate || task.plannedEndDate;
+                const overdue = Boolean(due) && task.status !== 'DONE' && new Date(due!).getTime() < today;
+                const subtasks = task.subtasks || [];
+                const doneSubtasks = subtasks.filter((subtask) => subtask.status === 'DONE').length;
+                const comments = task._count?.comments || 0;
+                const waiting = task.blockedBy?.some((dependency) => dependency.predecessor.status !== 'DONE');
+                const isBlocked = task.status === 'BLOCKED';
+                const done = task.status === 'DONE';
+                const days = daysSince(task.statusChangedAt);
+                const tracksAge = task.status === 'IN_PROGRESS' || task.status === 'REVIEW';
+                return (
+                  <KanbanCard key={task.id} id={`task-${task.id}`} dragProps={dragProps(task)} dragging={dragged === task.id} blocked={isBlocked} dimmed={done} focused={focusedTaskId === task.id}>
+                    <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <span className="shrink-0 font-mono text-[10.5px]">{taskCode(task.number)}</span>
+                      {task.requirement && <span className="min-w-0 truncate rounded border px-1.5 font-semibold">{task.requirement.code || 'REQ'}</span>}
+                      {(task.priority === 'URGENT' || task.priority === 'HIGH') && (
+                        <span className={cn('ml-auto shrink-0 rounded px-1.5 text-[10px] font-bold uppercase tracking-wide', task.priority === 'URGENT' ? 'bg-rose-500/15 text-rose-400' : 'bg-amber-500/15 text-amber-400')}>{formatProjectPriority(task.priority)}</span>
+                      )}
+                    </div>
+                    <h3 className={cn('line-clamp-3 font-semibold leading-snug', done && 'line-through')}>
+                      <Link href={taskHref(task.id)} scroll={false} draggable={false} data-card-open className="after:absolute after:inset-0 after:rounded-lg focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-ring" aria-label={`${taskCode(task.number)} ${task.title}. ${formatTaskStatus(task.status)}. Abrir detalle`}>
+                        {task.title}
+                      </Link>
+                    </h3>
+                    {isBlocked && (
+                      <p className="flex items-center gap-1 text-[11px] font-semibold text-rose-400">
+                        <Lock className="size-3" aria-hidden="true" />
+                        Bloqueada{days > 0 && <span className="font-normal"> · hace {days} d</span>}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-muted-foreground">
+                      {due && <span className={cn('inline-flex items-center gap-1 whitespace-nowrap', overdue && 'font-semibold text-rose-400')}><Calendar className="size-3" aria-hidden="true" />{overdue ? 'Venció ' : ''}{formatCompactDate(due)}</span>}
+                      {tracksAge && days > 0 && <span className={cn('whitespace-nowrap tabular-nums', days >= STALE_DAYS && 'font-semibold text-amber-400')} title="Días en esta columna"><span aria-hidden="true">⏱ </span>{days} d</span>}
+                      {subtasks.length > 0 && <span className="inline-flex items-center gap-1" title="Subtareas terminadas"><ListChecks className="size-3" aria-hidden="true" />{doneSubtasks}/{subtasks.length}</span>}
+                      {comments > 0 && <span className="inline-flex items-center gap-1" title="Comentarios"><MessageSquare className="size-3" aria-hidden="true" />{comments}</span>}
+                      {task.status === 'REVIEW' && task.reviewer && <span className="inline-flex items-center gap-1" title="Revisor"><Eye className="size-3" aria-hidden="true" />{task.reviewer.name.split(' ')[0]}</span>}
+                      {waiting && !isBlocked && <span className="inline-flex items-center gap-1 text-amber-400" title="Tiene prerequisitos pendientes"><Lock className="size-3" aria-hidden="true" />Espera</span>}
+                      <span className="ml-auto" title={task.assignedTo?.name ?? 'Sin responsable'}>
+                        {task.assignedTo ? <KanbanAvatar name={task.assignedTo.name} /> : <span className="text-[10px]">Sin responsable</span>}
+                      </span>
+                    </div>
+                  </KanbanCard>
+                );
+              })}
+            </KanbanColumn>
+          );
+        })}
+      </KanbanScroller>
+
+      <Sheet open={newTaskStatus !== null} onOpenChange={(open) => { if (!open) { setNewTaskStatus(null); setNewTaskError(null); } }}>
+        <SheetContent side="right" className="overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Nueva tarea</SheetTitle>
+            <SheetDescription>Se crea en «{formatTaskStatus(newTaskStatus || 'TODO')}». Podrás dividirla en subtareas desde su detalle.</SheetDescription>
+          </SheetHeader>
+          <form onSubmit={handleCreateTask} className="space-y-3">
+            <label className="block text-sm font-medium">Título<input name="title" required maxLength={200} autoFocus placeholder="Ej. Maquetar la página de inicio" className={field} /></label>
+            <div className="grid grid-cols-2 gap-2.5">
+              <label className="block text-sm font-medium">Responsable<select name="assignedToId" defaultValue="" className={field}><option value="">Sin responsable</option>{workers.map((worker) => <option key={worker.id} value={worker.id}>{worker.name}</option>)}</select></label>
+              <label className="block text-sm font-medium">Revisor<select name="reviewerId" defaultValue="" className={field}><option value="">Sin revisor</option>{workers.map((worker) => <option key={worker.id} value={worker.id}>{worker.name}</option>)}</select></label>
+              <label className="block text-sm font-medium">Inicio<input type="date" name="plannedStartDate" className={field} /></label>
+              <label className="block text-sm font-medium">Vence<input type="date" name="dueDate" className={field} /></label>
+              <label className="block text-sm font-medium">Estimación (horas)<input type="number" name="estimateHours" min={0} max={9999} step={0.5} inputMode="decimal" className={field} /></label>
+              <label className="block text-sm font-medium">Prioridad<select name="priority" defaultValue="MEDIUM" className={field}>{['LOW', 'MEDIUM', 'HIGH', 'URGENT'].map((value) => <option key={value} value={value}>{formatProjectPriority(value)}</option>)}</select></label>
+              <label className="block text-sm font-medium">Hito<select name="milestoneId" defaultValue="" className={field}><option value="">Suelta (sin hito)</option>{milestones.map((milestone) => <option key={milestone.id} value={milestone.id}>{milestone.title}</option>)}</select></label>
+              {usesSprints && <label className="block text-sm font-medium">Sprint<select name="sprintId" defaultValue={sprints.find((sprint) => sprint.status === 'ACTIVE')?.id || ''} className={field}><option value="">Sin sprint</option>{sprints.map((sprint) => <option key={sprint.id} value={sprint.id}>{sprint.name}</option>)}</select></label>}
             </div>
+            <label className="block text-sm font-medium">Requerimiento<select name="requirementId" defaultValue="" className={field}><option value="">Sin requerimiento</option>{requirements.map((requirement) => <option key={requirement.id} value={requirement.id}>{requirement.code ? `${requirement.code} · ` : ''}{requirement.title}</option>)}</select><span className="mt-1 block text-xs font-normal text-muted-foreground">Si el requerimiento tiene hito, la tarea toma ese hito.</span></label>
+            {newTaskError && <p role="alert" className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{newTaskError}</p>}
+            <div className="flex justify-end gap-2 border-t pt-3">
+              <Button type="button" variant="outline" size="sm" onClick={() => setNewTaskStatus(null)}>Cancelar</Button>
+              <Button type="submit" size="sm" disabled={isPending}>{isPending ? 'Creando…' : 'Crear tarea'}</Button>
+            </div>
+          </form>
+        </SheetContent>
+      </Sheet>
 
-            <form onSubmit={handleCreateTask} className="space-y-3.5">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Título de la tarea
-                </label>
-                <input
-                  required
-                  placeholder="Ej. Wireframing the Homepage Layout"
-                  value={newTaskTitle}
-                  onChange={(e) => setNewTaskTitle(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-2 text-xs outline-none focus:bg-white focus:ring-2 focus:ring-blue-600"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Sprint
-                  </label>
-                  <select
-                    value={newTaskSprintId}
-                    onChange={(e) => setNewTaskSprintId(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-1.5 text-xs outline-none focus:bg-white focus:ring-2 focus:ring-blue-600"
-                  >
-                    <option value="">Sin Sprint (Backlog)</option>
-                    {sprints.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Prioridad
-                  </label>
-                  <select
-                    value={newTaskPriority}
-                    onChange={(e) => setNewTaskPriority(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-1.5 text-xs outline-none focus:bg-white focus:ring-2 focus:ring-blue-600"
-                  >
-                    <option value="LOW">Baja</option>
-                    <option value="MEDIUM">Media</option>
-                    <option value="HIGH">Alta</option>
-                    <option value="URGENT">Urgente</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2.5">
-                <label className="block text-xs font-semibold text-slate-700">Inicio planificado<input type="date" value={newTaskStartDate} onChange={(e) => setNewTaskStartDate(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-blue-600" /></label>
-                <label className="block text-xs font-semibold text-slate-700">Fin planificado<input type="date" min={newTaskStartDate || undefined} value={newTaskEndDate} onChange={(e) => setNewTaskEndDate(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-blue-600" /></label>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Requerimiento
-                  </label>
-                  <select
-                    value={newTaskReqId}
-                    onChange={(e) => setNewTaskReqId(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-1.5 text-xs outline-none focus:bg-white focus:ring-2 focus:ring-blue-600"
-                  >
-                    <option value="">Sin requerimiento</option>
-                    {requirements.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.code ? `[${r.code}] ` : ''}
-                        {r.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Responsable
-                  </label>
-                  <select
-                    value={newTaskWorkerId}
-                    onChange={(e) => setNewTaskWorkerId(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-1.5 text-xs outline-none focus:bg-white focus:ring-2 focus:ring-blue-600"
-                  >
-                    <option value="">Sin asignar</option>
-                    {workers.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name}{w.role === 'ADMIN' ? ' (Administrador)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setNewTaskOpen(false)}
-                  className="rounded-xl"
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  disabled={isPending}
-                  type="submit"
-                  size="sm"
-                  className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  {isPending ? 'Creando…' : 'Crear tarea'}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Evidence Modal Component */}
       {evidenceModalTask && (
-        <EvidenceModal
-          projectId={projectId}
-          taskId={evidenceModalTask.id}
-          taskTitle={evidenceModalTask.title}
-          evidences={evidenceModalTask.evidences || []}
-          isOpen={true}
-          onClose={() => setEvidenceModalTask(null)}
-        />
+        <EvidenceModal projectId={projectId} taskId={evidenceModalTask.id} taskTitle={evidenceModalTask.title} evidences={evidenceModalTask.evidences || []} isOpen onClose={() => setEvidenceModalTask(null)} />
       )}
     </div>
   );

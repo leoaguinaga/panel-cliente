@@ -1,7 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { backendFetch } from '@/src/lib/api/server';
+import { BackendApiError, backendFetch } from '@/src/lib/api/server';
+import type { ProjectSite } from '@/src/modules/dashboard/server/queries';
 
 const text = (formData: FormData, key: string) => String(formData.get(key) || '').trim();
 const refresh = (projectId?: string) => {
@@ -39,6 +40,7 @@ export async function updateProjectAction(id: string, formData: FormData) {
       productId: text(formData, 'productId') || null,
       price: Number(formData.get('price') || 0),
       responsibleWorkerId: text(formData, 'responsibleWorkerId') || null,
+      ...(formData.has('usesSprintsField') ? { usesSprints: formData.get('usesSprints') === 'on' } : {}),
     }),
   });
   refresh(id);
@@ -88,7 +90,9 @@ export async function createRequirementAction(projectId: string, formData: FormD
       code: text(formData, 'code') || undefined,
       title: text(formData, 'title'),
       description: text(formData, 'description') || null,
+      ...(formData.has('acceptanceCriteria') ? { acceptanceCriteria: JSON.parse(text(formData, 'acceptanceCriteria')) } : {}),
       priority: text(formData, 'priority') || 'MEDIUM',
+      milestoneId: text(formData, 'milestoneId') || null,
     }),
   });
   refresh(projectId);
@@ -102,6 +106,7 @@ export async function updateRequirementAction(projectId: string, reqId: string, 
       code: text(formData, 'code') || undefined,
       title: text(formData, 'title'),
       description: text(formData, 'description') || null,
+      ...(formData.has('acceptanceCriteria') ? { acceptanceCriteria: JSON.parse(text(formData, 'acceptanceCriteria')) } : {}),
       priority: text(formData, 'priority') || 'MEDIUM',
     }),
   });
@@ -179,19 +184,6 @@ export async function deleteTaskDependencyAction(projectId: string, taskId: stri
 }
 
 // Evidences
-export async function addTaskEvidenceAction(projectId: string, taskId: string, formData: FormData) {
-  await backendFetch(`/projects/${projectId}/tasks/${taskId}/evidences`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      title: text(formData, 'title') || 'Evidencia de cumplimiento',
-      fileUrl: text(formData, 'fileUrl'),
-      notes: text(formData, 'notes') || null,
-    }),
-  });
-  refresh(projectId);
-}
-
 export async function deleteTaskEvidenceAction(projectId: string, taskId: string, evidenceId: string) {
   await backendFetch(`/projects/${projectId}/tasks/${taskId}/evidences/${evidenceId}`, { method: 'DELETE' });
   refresh(projectId);
@@ -213,14 +205,14 @@ export async function createMilestoneAction(projectId: string, formData: FormDat
 }
 
 export async function updateMilestoneAction(projectId: string, milestoneId: string, formData: FormData) {
-  await backendFetch(`/projects/${projectId}/milestones/${milestoneId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: text(formData, 'title') || undefined, status: text(formData, 'status') || undefined, dueDate: text(formData, 'dueDate') || null, visibleToClient: formData.get('visibleToClient') === 'on' }) });
+  await backendFetch(`/projects/${projectId}/milestones/${milestoneId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: text(formData, 'title') || undefined, dueDate: text(formData, 'dueDate') || null, visibleToClient: formData.get('visibleToClient') === 'on' }) });
   refresh(projectId);
 }
 
 export async function deleteMilestoneAction(projectId: string, milestoneId: string) { await backendFetch(`/projects/${projectId}/milestones/${milestoneId}`, { method: 'DELETE' }); refresh(projectId); }
 
 export async function upsertScopeAction(projectId: string, formData: FormData) {
-  await backendFetch(`/projects/${projectId}/scope`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ summary: text(formData, 'summary'), inclusions: text(formData, 'inclusions'), exclusions: text(formData, 'exclusions'), assumptions: text(formData, 'assumptions') }) });
+  await backendFetch(`/projects/${projectId}/scope`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ inclusions: text(formData, 'inclusions'), exclusions: text(formData, 'exclusions'), assumptions: text(formData, 'assumptions') }) });
   refresh(projectId);
 }
 
@@ -236,7 +228,31 @@ export async function updateDeliverableAction(projectId: string, deliverableId: 
 
 export async function deleteDeliverableAction(projectId: string, deliverableId: string) { await backendFetch(`/projects/${projectId}/deliverables/${deliverableId}`, { method: 'DELETE' }); refresh(projectId); }
 
-export async function updatePaymentAction(projectId: string, paymentId: string, formData: FormData) {
-  await backendFetch(`/projects/${projectId}/payments/${paymentId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept: text(formData, 'concept'), amount: Number(formData.get('amount') || 0), percentage: text(formData, 'percentage') ? Number(formData.get('percentage')) : null, currency: text(formData, 'currency') || 'USD', dueDate: text(formData, 'dueDate') || null, status: text(formData, 'status'), milestoneId: text(formData, 'milestoneId') || null, notes: text(formData, 'notes') }) });
+export async function setRequirementCriteriaAction(projectId: string, reqId: string, acceptanceCriteria: Array<{ id: string; text: string; checked: boolean }>) {
+  await backendFetch(`/projects/${projectId}/requirements/${reqId}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ acceptanceCriteria }),
+  });
   refresh(projectId);
+}
+
+type SiteResult = { ok: true; site: ProjectSite | null } | { ok: false; error: string };
+async function siteCall(projectId: string, path: string, init: RequestInit): Promise<SiteResult> {
+  try {
+    const site = await backendFetch<ProjectSite | { ok: true }>(`/projects/${projectId}/site${path}`, init);
+    refresh(projectId);
+    revalidatePath('/client', 'layout');
+    return { ok: true, site: 'url' in site ? site : null };
+  } catch (error) {
+    return { ok: false, error: error instanceof BackendApiError ? error.message : 'No fue posible guardar el enlace' };
+  }
+}
+export async function saveProjectSiteAction(projectId: string, body: { url: string; kind: 'LIVE' | 'DEMO'; comment: string }) {
+  return siteCall(projectId, '', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(30_000) });
+}
+export async function refreshProjectSiteAction(projectId: string) {
+  return siteCall(projectId, '/refresh', { method: 'POST', signal: AbortSignal.timeout(30_000) });
+}
+export async function deleteProjectSiteAction(projectId: string) {
+  return siteCall(projectId, '', { method: 'DELETE' });
 }

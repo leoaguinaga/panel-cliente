@@ -2,11 +2,11 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { CalendarRange, ClipboardList, FileText, Kanban, Layers, ListChecks, Settings, Target, WalletCards } from 'lucide-react';
+import { CalendarRange, ClipboardList, FileText, Kanban, Layers, ListChecks, Target, WalletCards } from 'lucide-react';
 
 const groups = [
   { segment: '/tasks/', label: 'Tareas y progreso', href: 'tasks/kanban', icon: Kanban },
-  { segment: '/planning/', label: 'Hitos y planificación', href: 'planning/requirements', icon: Target },
+  { segment: '/planning/', label: 'Hitos y planificación', href: 'planning/milestones', icon: Target },
   { segment: '/documentation/', label: 'Documentación', href: 'documentation/contracts', icon: FileText },
 ];
 
@@ -17,8 +17,8 @@ const tabs = {
     { href: 'tasks/gantt', label: 'Gantt', icon: CalendarRange },
   ],
   planning: [
-    { href: 'planning/requirements', label: 'Requerimientos', icon: ClipboardList },
     { href: 'planning/milestones', label: 'Hitos', icon: Target },
+    { href: 'planning/requirements', label: 'Requerimientos', icon: ClipboardList },
     { href: 'planning/scope', label: 'Alcance', icon: ListChecks },
   ],
   documentation: [
@@ -28,7 +28,7 @@ const tabs = {
   ],
 };
 
-export function ProjectNavigation({ projectId }: { projectId: string }) {
+export function ProjectNavigation({ projectId, usesSprints, settings }: { projectId: string; usesSprints: boolean; settings: React.ReactNode }) {
   const pathname = usePathname();
   const activeGroup = pathname.includes('/tasks/') ? 'tasks' : pathname.includes('/planning/') ? 'planning' : pathname.includes('/documentation/') ? 'documentation' : null;
   const base = `/internal/projects/${projectId}`;
@@ -41,12 +41,12 @@ export function ProjectNavigation({ projectId }: { projectId: string }) {
           const active = pathname.includes(segment);
           return <Link key={href} href={`${base}/${href}`} aria-current={active ? 'page' : undefined} className={`inline-flex min-h-11 shrink-0 items-center gap-2 px-3.5 py-2.5 text-xs font-semibold ${active ? 'border-b-2 border-blue-600 text-blue-700' : 'text-slate-500 hover:text-slate-900'}`}><Icon className="size-4" />{label}</Link>;
         })}
-        <Link href={`${base}/settings`} aria-label="Ajustes del proyecto" aria-current={pathname.endsWith('/settings') ? 'page' : undefined} className={`ml-auto inline-flex min-h-11 shrink-0 items-center gap-2 px-3.5 py-2.5 text-xs font-semibold ${pathname.endsWith('/settings') ? 'border-b-2 border-blue-600 text-blue-700' : 'text-slate-500 hover:text-slate-900'}`}><Settings className="size-4" />Ajustes</Link>
+        {settings}
       </div>
       {activeGroup && <div className="flex items-center gap-1 overflow-x-auto rounded-xl bg-slate-50 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label={`Vistas de ${activeGroup}`}>
-        {tabs[activeGroup].map(({ href, label, icon: Icon }) => {
+        {tabs[activeGroup].filter(({ href }) => usesSprints || href !== 'tasks/sprints').map(({ href, label, icon: Icon }) => {
           const active = pathname.endsWith(`/${href}`);
-          return <Link key={href} href={`${base}/${href}`} aria-current={active ? 'page' : undefined} className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${active ? 'bg-white text-slate-900 shadow-xs ring-1 ring-slate-200' : 'text-slate-500 hover:bg-white/70 hover:text-slate-900'}`}><Icon className="size-3.5" />{label}</Link>;
+          return <Link key={href} href={`${base}/${href}`} aria-current={active ? 'page' : undefined} className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${active ? 'bg-card text-slate-900 shadow-xs ring-1 ring-slate-200' : 'text-slate-500 hover:bg-card/70 hover:text-slate-900'}`}><Icon className="size-3.5" />{label}</Link>;
         })}
       </div>}
     </nav>

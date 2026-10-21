@@ -3,18 +3,12 @@
 import { useRouter } from "next/navigation"
 import {
   ChevronsUpDown,
+  CircleUserRound,
   LogOut,
   Settings,
-  Settings2,
-  User,
-  User2,
 } from "lucide-react"
 
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/shared/UserAvatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,29 +24,26 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { ROUTES } from "@/lib/constants"
 import { authClient } from "@/src/lib/auth-client"
 
-export function NavUser({
-  user,
-}: {
-  user?: {
-    name?: string | null
-    email?: string | null
-    avatar?: string | null
-    role?: string | null
-  } | null
-}) {
+export type NavUserData = {
+  id?: string | null
+  name?: string | null
+  email?: string | null
+  image?: string | null
+  jobTitle?: string | null
+  role?: string | null
+}
+
+export function NavUser({ user }: { user?: NavUserData | null }) {
   const { isMobile } = useSidebar()
   const router = useRouter()
 
   const displayName = user?.name || user?.email?.split("@")[0] || "Colaborador"
   const displayEmail = user?.email || "foxcode.pe"
-  const initials = displayName
-    .split(" ")
-    .map((n) => n[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase() || "FX"
+  const subtitle = user?.jobTitle || displayEmail
+  const avatarUser = { id: user?.id, name: displayName, image: user?.image }
 
   const handleSignOut = async () => {
     try {
@@ -74,33 +65,47 @@ export function NavUser({
               size="lg"
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <Avatar className="size-8 rounded-lg">
-                {user?.avatar && <AvatarImage src={user.avatar} alt={displayName} />}
-                <AvatarFallback className="rounded-lg bg-primary text-primary-foreground font-semibold">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
+              <UserAvatar user={avatarUser} className="size-8 rounded-lg" />
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">{displayName}</span>
-                <span className="truncate text-xs text-muted-foreground">{displayEmail}</span>
+                <span className="truncate text-xs text-muted-foreground">{subtitle}</span>
               </div>
               <ChevronsUpDown className="ml-auto size-4" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
             className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
-            side="bottom"
+            side={isMobile ? "bottom" : "top"}
             align="end"
             sideOffset={4}
           >
+            <DropdownMenuLabel className="p-0 font-normal">
+              <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+                <UserAvatar user={avatarUser} className="size-8 rounded-lg" />
+                <div className="grid flex-1 leading-tight">
+                  <span className="truncate font-semibold">{displayName}</span>
+                  <span className="truncate text-xs text-muted-foreground">{displayEmail}</span>
+                </div>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem
-                onClick={() => router.push("/internal/profile")}
+                onClick={() => router.push(ROUTES.internal.profile)}
                 className="gap-2 cursor-pointer"
               >
-                <Settings2 className="size-4" />
-                Ajustes
+                <CircleUserRound className="size-4" />
+                Mi perfil
               </DropdownMenuItem>
+              {user?.role === "ADMIN" && (
+                <DropdownMenuItem
+                  onClick={() => router.push(ROUTES.internal.settings)}
+                  className="gap-2 cursor-pointer"
+                >
+                  <Settings className="size-4" />
+                  Configuración
+                </DropdownMenuItem>
+              )}
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem

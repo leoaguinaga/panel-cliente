@@ -76,6 +76,7 @@ export const leadStatusLabels: Record<string, string> = {
   LOST: 'Perdido',
 };
 export const formatLeadStatus = (value: string) => leadStatusLabels[value] || humanizeFallback(value);
+export const taskCode = (number?: number | null) => (number ? `FOX-${number}` : 'FOX-?');
 export const formatTaskStatus = (value: string) => taskStatusLabels[value] || humanizeFallback(value);
 export const formatClientStatus = (value: string) => clientStatusLabels[value] || humanizeFallback(value);
 export const projectTypeOptions = Object.entries(projectTypeLabels).map(([value, label]) => ({ value, label }));

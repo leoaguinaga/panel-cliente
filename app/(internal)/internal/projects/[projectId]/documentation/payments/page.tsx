@@ -1,5 +1,36 @@
-import { PaymentConditions } from '@/components/agile/PaymentConditions';
-import { PaymentScheduleEditor } from '@/components/projects/PaymentScheduleEditor';
+import { PlanEditor } from '@/components/projects/PlanEditor';
+import { ProjectPaymentPlan } from '@/components/projects/ProjectPaymentPlan';
 import { getProjectDocumentation } from '@/src/modules/projects/server/queries';
+import { getPaymentAgenda } from '@/src/modules/payments/server/queries';
+import { getSession } from '@/src/lib/auth';
 
-export default async function PaymentsPage({ params }: { params: Promise<{ projectId: string }> }) { const { projectId } = await params; const data = await getProjectDocumentation(projectId); const scheduled = data.payments.filter((payment) => payment.status !== 'CANCELLED').reduce((sum, payment) => sum + Number(payment.amount), 0); const paid = data.payments.filter((payment) => payment.status === 'PAID').reduce((sum, payment) => sum + Number(payment.amount), 0); return <section aria-labelledby="payments-title" className="space-y-5"><div><h2 id="payments-title" className="text-base font-bold text-slate-900">Condiciones de pago</h2><p className="mt-1 text-sm text-slate-500">Programa cobros y relaciónalos con hitos del proyecto.</p></div><div className="grid gap-3 sm:grid-cols-3"><div className="rounded-2xl border bg-white p-4"><p className="text-xs text-slate-500">Precio del proyecto</p><p className="mt-1 text-xl font-bold">USD {Number(data.price).toLocaleString()}</p></div><div className="rounded-2xl border bg-white p-4"><p className="text-xs text-slate-500">Programado</p><p className="mt-1 text-xl font-bold">USD {scheduled.toLocaleString()}</p></div><div className="rounded-2xl border bg-white p-4"><p className="text-xs text-slate-500">Cobrado</p><p className="mt-1 text-xl font-bold text-emerald-700">USD {paid.toLocaleString()}</p></div></div><PaymentConditions projectId={projectId} projectPrice={Number(data.price)} payments={data.payments} /><PaymentScheduleEditor projectId={projectId} payments={data.payments} milestones={data.milestones} /></section>; }
+export default async function PaymentsPage({ params }: { params: Promise<{ projectId: string }> }) {
+  const { projectId } = await params;
+  const [data, plan, session] = await Promise.all([
+    getProjectDocumentation(projectId),
+    getPaymentAgenda({ projectId }),
+    getSession(),
+  ]);
+  const isAdmin = session?.user.role === 'ADMIN';
+  const empty = data.payments.every((payment) => payment.status === 'CANCELLED');
+  const paidById = Object.fromEntries(plan.items.map((item) => [item.id, item.paidAmount]));
+  // El editor guarda borradores en su estado: se monta de nuevo cuando el plan cambia en el servidor.
+  const version = data.payments.map((p) => [p.id, p.status, p.amount, p.concept, p.dueDate, p.milestoneId, p.notes, paidById[p.id]].join(':')).join('|');
+
+  return (
+    <section aria-label="Pagos del proyecto" className="space-y-8">
+      <ProjectPaymentPlan items={plan.items} today={plan.summary.today} isAdmin={isAdmin} reminder={plan.reminder} projectPrice={Number(data.price)} />
+
+      <details open={empty} className="group rounded-xl border">
+        <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+          <span aria-hidden="true" className="text-xs text-muted-foreground transition group-open:rotate-90">▸</span>
+          Editar plan
+          <span className="font-normal text-muted-foreground">· conceptos, montos, fechas e hitos de cada cuota</span>
+        </summary>
+        <div className="border-t p-4">
+          <PlanEditor key={version} projectId={projectId} clientId={data.clientId} projectPrice={Number(data.price)} payments={data.payments} paidById={paidById} milestones={data.milestones} isAdmin={isAdmin} />
+        </div>
+      </details>
+    </section>
+  );
+}

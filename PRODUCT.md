@@ -14,7 +14,7 @@ Los clientes tendrán posteriormente un portal externo reducido, basado en la mi
 
 Panel interno tipo ERP operativo para centralizar clientes, servicios, productos propios, proyectos, tareas, responsables, alcances, documentación, avances y actividad de Foxcode.
 
-Foxcode gestiona dos líneas de servicio —desarrollo de sitios web y desarrollo de software a medida— y tres productos propios —FoxEats, FoxRooms y Contralio—. El producto debe reducir la dispersión de información y ofrecer una fuente de verdad operativa para ejecutar y supervisar el trabajo.
+Foxcode gestiona dos líneas de servicio —desarrollo de sitios web y desarrollo de software a medida— y tres productos propios —FoxRooms, En La Mesa y Contralio—. Cada producto es un espacio de trabajo con sus propios leads, demos y proyectos; FoxCode (servicios) es el espacio base. El producto debe reducir la dispersión de información y ofrecer una fuente de verdad operativa para ejecutar y supervisar el trabajo.
 
 ## Brand Personality
 

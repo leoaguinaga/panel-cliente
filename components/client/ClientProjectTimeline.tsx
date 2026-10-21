@@ -1,4 +1,5 @@
 import { formatDate, milestoneStatus, sprintStatus } from '@/components/client/client-formatters';
+import { isMilestoneDone } from '@/src/modules/projects/types';
 
 type Phase = { id: string; name: string; status: string; startDate: string | null; endDate: string | null };
 type Milestone = { id: string; title: string; status: string; dueDate?: string | null; completedAt: string | null };
@@ -37,7 +38,7 @@ export function ClientProjectTimeline({ startDate, endDate, phases, milestones }
       </li>; })}
       {dated.length > 0 && <li className="grid gap-1 sm:grid-cols-[10rem_1fr] sm:items-center sm:gap-4">
         <p className="text-sm font-medium text-slate-900">Hitos</p>
-        <div className="relative h-8 rounded-lg bg-slate-50">{grid}{dated.map((m) => { const at = day((m.completedAt || m.dueDate)!); const done = m.status === 'COMPLETED'; return <span key={m.id} className={`absolute top-2 h-4 w-4 -translate-x-1/2 rotate-45 rounded-[3px] ring-2 ring-white ${done ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ left: `${pct(at)}%` }} title={`${m.title} · ${milestoneStatus[m.status] || m.status} · ${formatDate(m.completedAt || m.dueDate || null)}`} />; })}</div>
+        <div className="relative h-8 rounded-lg bg-slate-50">{grid}{dated.map((m) => { const at = day((m.completedAt || m.dueDate)!); const done = isMilestoneDone(m.status); return <span key={m.id} className={`absolute top-2 h-4 w-4 -translate-x-1/2 rotate-45 rounded-[3px] ring-2 ring-card ${done ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ left: `${pct(at)}%` }} title={`${m.title} · ${milestoneStatus[m.status] || m.status} · ${formatDate(m.completedAt || m.dueDate || null)}`} />; })}</div>
       </li>}
     </ol>
     <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-500" aria-label="Leyenda">

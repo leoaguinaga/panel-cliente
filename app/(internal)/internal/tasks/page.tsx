@@ -48,7 +48,9 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         workers={workers}
         projects={projects.filter((project) => !CLOSED_PROJECTS.includes(project.status)).map((project) => ({ id: project.id, name: project.name }))}
         filterBar={
+          // Elemento de servidor que el cliente pinta entre hermanos: sin key, React avisa en dev.
           <FilterBar
+            key="filters"
             defaultView={DEFAULT_VIEW}
             views={[
               { id: 'mine', label: 'Mías', count: facets.views.mine },
@@ -70,6 +72,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
           milestones={context.milestones}
           sprints={context.sprints}
           requirements={context.requirements}
+          usesSprints={context.usesSprints}
           currentUser={{ id: session.user.id, role: session.user.role }}
         />
       )}

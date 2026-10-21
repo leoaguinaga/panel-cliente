@@ -1,8 +1,12 @@
 const styles: Record<string, string> = {
   IN_PROGRESS: 'bg-blue-50 text-blue-700 ring-blue-600/20',
+  INVITED: 'bg-amber-50 text-amber-700 ring-amber-600/20',
   ACTIVE: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
   DONE: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
   COMPLETED: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+  APPROVED: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+  IN_REVIEW: 'bg-violet-50 text-violet-700 ring-violet-600/20',
+  SCHEDULED: 'bg-slate-50 text-slate-500 ring-slate-500/20',
   BLOCKED: 'bg-red-50 text-red-700 ring-red-600/20',
   REVIEW: 'bg-violet-50 text-violet-700 ring-violet-600/20',
   PROSPECT: 'bg-sky-50 text-sky-700 ring-sky-600/20',
@@ -22,9 +26,13 @@ const styles: Record<string, string> = {
 
 const labels: Record<string, string> = {
   IN_PROGRESS: 'En progreso',
+  INVITED: 'Invitación pendiente',
   ACTIVE: 'Activo',
   DONE: 'Completada',
   COMPLETED: 'Completado',
+  APPROVED: 'Aprobado',
+  IN_REVIEW: 'En revisión',
+  SCHEDULED: 'Programado',
   BLOCKED: 'Bloqueado',
   REVIEW: 'En revisión',
   PROSPECT: 'Prospecto',

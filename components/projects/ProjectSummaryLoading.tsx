@@ -33,11 +33,11 @@ function ProjectSummaryFixture() {
       <main className="space-y-5">
         <div className="space-y-2"><div className="h-5 w-40 rounded bg-slate-200" /><div className="h-4 w-72 max-w-full rounded bg-slate-200" /></div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          {Array.from({ length: 5 }, (_, index) => <div key={index} className="h-28 rounded-2xl border bg-white p-4"><div className="flex justify-between"><div className="size-5 rounded bg-slate-200" /><div className="h-8 w-10 rounded bg-slate-200" /></div><div className="mt-5 h-4 w-24 rounded bg-slate-200" /></div>)}
+          {Array.from({ length: 5 }, (_, index) => <div key={index} className="h-28 rounded-2xl border bg-card p-4"><div className="flex justify-between"><div className="size-5 rounded bg-slate-200" /><div className="h-8 w-10 rounded bg-slate-200" /></div><div className="mt-5 h-4 w-24 rounded bg-slate-200" /></div>)}
         </div>
         <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
-          <div className="h-44 rounded-2xl border bg-white p-5"><div className="h-5 w-28 rounded bg-slate-200" /><div className="mt-4 h-4 w-full rounded bg-slate-200" /><div className="mt-2 h-4 w-4/5 rounded bg-slate-200" /></div>
-          <div className="h-44 rounded-2xl border bg-white p-5"><div className="h-5 w-32 rounded bg-slate-200" /><div className="mt-4 space-y-3">{Array.from({ length: 4 }, (_, index) => <div key={index} className="flex justify-between gap-4"><div className="h-4 w-20 rounded bg-slate-200" /><div className="h-4 w-24 rounded bg-slate-200" /></div>)}</div></div>
+          <div className="h-44 rounded-2xl border bg-card p-5"><div className="h-5 w-28 rounded bg-slate-200" /><div className="mt-4 h-4 w-full rounded bg-slate-200" /><div className="mt-2 h-4 w-4/5 rounded bg-slate-200" /></div>
+          <div className="h-44 rounded-2xl border bg-card p-5"><div className="h-5 w-32 rounded bg-slate-200" /><div className="mt-4 space-y-3">{Array.from({ length: 4 }, (_, index) => <div key={index} className="flex justify-between gap-4"><div className="h-4 w-20 rounded bg-slate-200" /><div className="h-4 w-24 rounded bg-slate-200" /></div>)}</div></div>
         </div>
       </main>
     </div>

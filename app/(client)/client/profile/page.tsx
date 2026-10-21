@@ -1,4 +1,7 @@
-import { Building2, Mail, MapPin, Phone, UserRound } from 'lucide-react';
-import { ClientPageHeader } from '@/components/client/ClientPageHeader';
+import { ClientProfile } from '@/src/modules/profile/ClientProfile';
 import { getClientDashboard } from '@/src/modules/dashboard/server/queries';
-export default async function ClientProfilePage() { const data = await getClientDashboard(); const rows = [{ label: 'Correo de acceso', value: data.userEmail, icon: Mail }, { label: 'Teléfono de contacto', value: data.userPhone || data.client?.phone, icon: Phone }, { label: 'Empresa', value: data.client?.businessName || data.client?.name, icon: Building2 }, { label: 'Dirección', value: data.client?.address, icon: MapPin }]; return <><ClientPageHeader title="Mi perfil" description="Información asociada a tu acceso y a la cuenta de cliente." /><div className="grid gap-6 lg:grid-cols-[280px_1fr]"><aside className="rounded-2xl bg-slate-950 p-6 text-white"><span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10"><UserRound size={26} /></span><h2 className="mt-5 text-xl font-semibold">{data.userName}</h2><p className="mt-1 text-sm text-slate-300">Cliente Foxcode</p></aside><section className="rounded-2xl border border-slate-200 bg-white p-6"><h2 className="font-semibold text-slate-950">Datos de la cuenta</h2><div className="mt-5 divide-y divide-slate-100">{rows.map(({ label, value, icon: Icon }) => <div key={label} className="flex items-start gap-3 py-4"><Icon className="mt-0.5 text-slate-400" size={18} /><dl><dt className="text-xs font-medium text-slate-500">{label}</dt><dd className="mt-1 text-sm text-slate-900">{value || 'No registrado'}</dd></dl></div>)}</div><p className="mt-5 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">Para modificar datos legales o de facturación, comunícate con tu responsable de cuenta.</p></section></div></> }
+
+export default async function ClientProfilePage() {
+  const data = await getClientDashboard();
+  return <ClientProfile data={data} />;
+}

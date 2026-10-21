@@ -5,7 +5,7 @@ import type { ProjectSummary } from '@/src/modules/projects/types';
 const initials = (name?: string) => name ? name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase() : 'UN';
 
 export function ProjectHeader({ project }: { project: ProjectSummary }) {
-  const activeSprint = project.sprints[0];
+  const activeSprint = project.usesSprints ? project.sprints[0] : undefined;
   return <header className="space-y-4">
     <Link href="/internal/projects" className="inline-flex min-h-10 items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900"><ArrowLeft className="size-4" />Proyectos</Link>
     <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">

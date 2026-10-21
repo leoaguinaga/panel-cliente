@@ -4,7 +4,7 @@ import { Menu, Bell } from "lucide-react";
 
 export function InternalTopbar() {
   return (
-    <header className="h-14 border-b border-gray-200 bg-white flex items-center justify-between px-4 sticky top-0 z-10 md:px-6">
+    <header className="h-14 border-b border-gray-200 bg-card flex items-center justify-between px-4 sticky top-0 z-10 md:px-6">
       <div className="flex items-center gap-3">
         <button aria-label="Abrir navegación" className="md:hidden text-gray-500 hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black">
           <Menu size={20} />

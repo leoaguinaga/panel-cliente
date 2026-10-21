@@ -78,3 +78,6 @@ prisma/*.db-journal
 !/uploads/.gitkeep
 /temp
 /tmp
+
+# Isolated calendar acceptance runtime
+/.next-calendar-review/

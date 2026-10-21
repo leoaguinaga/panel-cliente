@@ -4,6 +4,7 @@ import { useState, useTransition, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ChevronDown, ListChecks, Lock, MessageSquare, Plus } from 'lucide-react';
+import { KanbanAddButton, KanbanAvatar, KanbanCard, KanbanColumn, KanbanScroller, kanbanScrollbar, useKanbanDrag } from './KanbanBoard';
 import { EvidenceModal } from '../agile/EvidenceUploader';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -29,7 +30,6 @@ const STALE_DAYS = 3;
 const daysSince = (date: string) => Math.max(0, Math.floor((Date.now() - new Date(date).getTime()) / 86400000));
 const UNASSIGNED = 'unassigned';
 
-const initials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
 const firstName = (name: string) => name.trim().split(/\s+/)[0];
 const startOfToday = () => new Date().setHours(0, 0, 0, 0);
 
@@ -61,8 +61,6 @@ export function TeamTaskBoard({
     setSynced(initialTasks);
     setTasks(initialTasks);
   }
-  const [dragged, setDragged] = useState<string | null>(null);
-  const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState<{ status: Column['id']; assigneeId: string | null } | null>(null);
   const [evidenceTask, setEvidenceTask] = useState<BoardTask | null>(null);
@@ -109,35 +107,7 @@ export function TeamTaskBoard({
     });
   };
 
-  const dropProps = (key: string, target: Column['id'], assigneeId?: string) => ({
-    onDragOver: (event: React.DragEvent) => {
-      event.preventDefault();
-      if (dropTarget !== key) setDropTarget(key);
-    },
-    onDragLeave: (event: React.DragEvent) => {
-      if (!event.currentTarget.contains(event.relatedTarget as Node)) setDropTarget(null);
-    },
-    onDrop: (event: React.DragEvent) => {
-      event.preventDefault();
-      setDropTarget(null);
-      const id = event.dataTransfer.getData('text/plain') || dragged;
-      setDragged(null);
-      const task = tasks.find((item) => item.id === id);
-      if (task) move(task, target, assigneeId);
-    },
-  });
-  const dragProps = (task: BoardTask) => ({
-    draggable: true,
-    onDragStart: (event: React.DragEvent) => {
-      event.dataTransfer.setData('text/plain', task.id);
-      event.dataTransfer.effectAllowed = 'move';
-      setDragged(task.id);
-    },
-    onDragEnd: () => {
-      setDragged(null);
-      setDropTarget(null);
-    },
-  });
+  const { dragged, dropTarget, dragProps, dropProps } = useKanbanDrag(tasks, (task, target, lane) => move(task, target as Column['id'], lane));
 
   const open = tasks.filter((task) => task.status !== 'DONE');
   const today = startOfToday();
@@ -191,46 +161,40 @@ export function TeamTaskBoard({
       {view === 'team' ? (
         <Lanes tasks={tasks} wipLimit={wipLimit} currentUser={currentUser} dropProps={dropProps} dropTarget={dropTarget} inProgress={inProgress} onCreate={setCreating} doneHref={doneHistoryHref()} {...cardProps} />
       ) : (
-        <div className="-mx-1 overflow-x-auto px-1 pb-2">
-          <div className="grid min-w-[720px] grid-cols-4 gap-3">
-            {COLUMNS.map((column) => {
-              const items = tasks.filter((task) => columnOf(task) === column.id);
-              const over = view === 'mine' && column.id === 'IN_PROGRESS' && items.length > wipLimit;
-              return (
-                <section
-                  key={column.id}
-                  aria-labelledby={`col-${column.id}`}
-                  {...dropProps(column.id, column.id)}
-                  className={cn(
-                    'flex min-h-[460px] flex-col gap-2 rounded-xl border bg-card/40 p-2.5 transition-colors',
-                    over && 'border-rose-500/50 bg-rose-500/[0.04]',
-                    dropTarget === column.id && 'border-ring bg-muted/40',
-                  )}
-                >
-                  <ColumnHeader column={column} count={items.length} limit={view === 'mine' && column.id === 'IN_PROGRESS' ? wipLimit : undefined} onAdd={column.id === 'DONE' ? undefined : () => setCreating({ status: column.id, assigneeId: view === 'mine' ? currentUser.id : null })} />
-                  {over && <p className="px-1 text-xs text-rose-400">Pasaste tu límite: termina una antes de tomar otra.</p>}
-                  <ul className="flex flex-1 flex-col gap-2">
-                    {items.map((task) => (
-                      <TaskCard key={task.id} task={task} {...cardProps} />
-                    ))}
-                    {!items.length && <li className="grid h-20 place-items-center rounded-lg border border-dashed text-xs text-muted-foreground">{column.id === 'DONE' ? 'Nada terminado esta semana' : 'Arrastra tareas aquí'}</li>}
-                  </ul>
-                  {column.id === 'TODO' && (
-                    <button type="button" onClick={() => setCreating({ status: 'TODO', assigneeId: view === 'mine' ? currentUser.id : null })} className="flex items-center gap-1.5 rounded-lg border border-dashed px-3 py-2 text-left text-xs text-muted-foreground hover:border-muted-foreground/60 hover:text-foreground">
-                      <Plus className="size-3.5" aria-hidden />
-                      Añadir tarea
-                    </button>
-                  )}
-                  {column.id === 'DONE' && !searchParams.get('status') && (
+        <KanbanScroller label="Tablero de tareas" columns={COLUMNS.length} fit>
+          {COLUMNS.map((column) => {
+            const items = tasks.filter((task) => columnOf(task) === column.id);
+            const limited = view === 'mine' && column.id === 'IN_PROGRESS';
+            const over = limited && items.length > wipLimit;
+            return (
+              <KanbanColumn
+                key={column.id}
+                column={column}
+                count={items.length}
+                meta={column.id === 'DONE' ? '7 días' : limited ? `${items.length} / ${wipLimit}` : undefined}
+                over={over}
+                highlighted={dropTarget === column.id}
+                dropProps={dropProps(column.id, column.id)}
+                onAdd={column.id === 'DONE' ? undefined : () => setCreating({ status: column.id, assigneeId: view === 'mine' ? currentUser.id : null })}
+                note={over && <p className="px-1 text-xs text-rose-400">Pasaste tu límite: termina una antes de tomar otra.</p>}
+                emptyLabel={column.id === 'DONE' ? 'Nada terminado esta semana' : 'Arrastra tareas aquí'}
+                footer={
+                  column.id === 'TODO' ? (
+                    <KanbanAddButton label="Añadir tarea" onClick={() => setCreating({ status: 'TODO', assigneeId: view === 'mine' ? currentUser.id : null })} />
+                  ) : column.id === 'DONE' && !searchParams.get('status') ? (
                     <Link href={doneHistoryHref()} className="py-1 text-center text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground">
                       Ver historial completo
                     </Link>
-                  )}
-                </section>
-              );
-            })}
-          </div>
-        </div>
+                  ) : undefined
+                }
+              >
+                {items.map((task) => (
+                  <TaskCard key={task.id} task={task} {...cardProps} />
+                ))}
+              </KanbanColumn>
+            );
+          })}
+        </KanbanScroller>
       )}
 
       <QuickCreate
@@ -242,23 +206,6 @@ export function TeamTaskBoard({
       />
       {evidenceTask && <EvidenceModal projectId={evidenceTask.project.id} taskId={evidenceTask.id} taskTitle={evidenceTask.title} evidences={[]} isOpen onClose={() => setEvidenceTask(null)} />}
     </section>
-  );
-}
-
-function ColumnHeader({ column, count, limit, onAdd }: { column: Column; count: number; limit?: number; onAdd?: () => void }) {
-  return (
-    <div className="flex items-center gap-2 px-1 pb-1 pt-0.5 text-[13px] font-semibold">
-      <span aria-hidden className={cn('size-2 rounded-full', column.dot)} />
-      <h2 id={`col-${column.id}`}>{column.title}</h2>
-      <span className={cn('ml-auto text-xs font-medium tabular-nums text-muted-foreground', limit !== undefined && count > limit && 'font-semibold text-rose-400')}>
-        {column.id === 'DONE' ? 'últimos 7 días' : limit !== undefined ? `${count} / ${limit}` : count}
-      </span>
-      {onAdd && (
-        <button type="button" onClick={onAdd} aria-label={`Añadir tarea en ${column.title}`} className="grid size-6 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
-          <Plus className="size-3.5" />
-        </button>
-      )}
-    </div>
   );
 }
 
@@ -282,16 +229,7 @@ function TaskCard({ task, href, dragProps, dragged, isOverdue, view, compact = f
   const stale = tracksAge && days >= STALE_DAYS;
   const label = `${taskCode(task.number)} ${task.title}. ${formatTaskStatus(task.status)}. Abrir detalle`;
   return (
-    <li
-      {...dragProps(task)}
-      className={cn(
-        'group relative cursor-grab rounded-lg border bg-card text-[13px] transition-shadow hover:border-muted-foreground/40 active:cursor-grabbing',
-        compact ? 'space-y-1 p-2' : 'space-y-2 p-2.5',
-        isBlocked && 'border-rose-500/45 shadow-[inset_3px_0_0_var(--color-rose-400)]',
-        done && 'opacity-60',
-        dragged === task.id && 'opacity-40',
-      )}
-    >
+    <KanbanCard dragProps={dragProps(task)} dragging={dragged === task.id} blocked={isBlocked} dimmed={done} compact={compact}>
       {!compact && (
         <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
           <span className="shrink-0 font-mono text-[10.5px]">{taskCode(task.number)}</span>
@@ -304,7 +242,7 @@ function TaskCard({ task, href, dragProps, dragged, isOverdue, view, compact = f
         </div>
       )}
       <h3 className={cn('font-semibold leading-snug', compact ? 'line-clamp-2 text-xs' : 'line-clamp-3', done && 'line-through')}>
-        <Link href={href(task)} scroll={false} draggable={false} aria-label={label} className="after:absolute after:inset-0 after:rounded-lg focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-ring">
+        <Link href={href(task)} scroll={false} draggable={false} data-card-open aria-label={label} className="after:absolute after:inset-0 after:rounded-lg focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-ring">
           {compact && <span className="mr-1 font-mono text-[10px] font-normal text-muted-foreground">{taskCode(task.number)}</span>}
           {task.title}
         </Link>
@@ -350,16 +288,12 @@ function TaskCard({ task, href, dragProps, dragged, isOverdue, view, compact = f
         {!compact && task.status === 'REVIEW' && task.reviewer && <span title="Revisor">Revisa {firstName(task.reviewer.name)}</span>}
         {!compact && view !== 'mine' && (
           <span className="ml-auto" title={task.assignedTo?.name ?? 'Sin responsable'}>
-            {task.assignedTo ? <Avatar name={task.assignedTo.name} /> : <span className="text-[10px]">Sin responsable</span>}
+            {task.assignedTo ? <KanbanAvatar name={task.assignedTo.name} /> : <span className="text-[10px]">Sin responsable</span>}
           </span>
         )}
       </div>
-    </li>
+    </KanbanCard>
   );
-}
-
-function Avatar({ name, me = false }: { name: string; me?: boolean }) {
-  return <span aria-hidden className={cn('grid size-6 shrink-0 place-items-center rounded-full text-[9.5px] font-bold', me ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground')}>{initials(name)}</span>;
 }
 
 function Lanes({
@@ -402,7 +336,7 @@ function Lanes({
   if (!lanes.length) return <p className="rounded-xl border p-6 text-center text-sm text-muted-foreground">No hay tareas con estos filtros.</p>;
 
   return (
-    <div className="overflow-x-auto rounded-xl border">
+    <div className={cn('overflow-x-auto rounded-xl border', kanbanScrollbar)}>
       <div className="min-w-[760px]">
         <div className="grid grid-cols-[160px_repeat(4,minmax(0,1fr))] border-b bg-card/60 text-xs font-semibold">
           <div className="px-3 py-2.5 text-muted-foreground">Persona</div>
@@ -423,7 +357,7 @@ function Lanes({
             <div key={person.id} className="grid grid-cols-[160px_repeat(4,minmax(0,1fr))] border-b last:border-b-0">
               <div className="flex flex-col gap-1 bg-card/60 px-3 py-3">
                 <button type="button" onClick={() => toggle(person.id)} aria-expanded={!isCollapsed} className="flex items-center gap-2 text-left text-[13px] font-semibold hover:text-foreground">
-                  {person.id === UNASSIGNED ? <span aria-hidden className="grid size-6 place-items-center rounded-full border border-dashed text-[10px] text-muted-foreground">—</span> : <Avatar name={person.name} me={person.id === currentUser.id} />}
+                  {person.id === UNASSIGNED ? <span aria-hidden className="grid size-6 place-items-center rounded-full border border-dashed text-[10px] text-muted-foreground">—</span> : <KanbanAvatar name={person.name} me={person.id === currentUser.id} />}
                   <span className="min-w-0 flex-1 truncate">{person.id === currentUser.id ? `${person.name} (tú)` : person.name}</span>
                   <ChevronDown aria-hidden className={cn('size-3.5 shrink-0 text-muted-foreground transition-transform', isCollapsed && '-rotate-90')} />
                 </button>

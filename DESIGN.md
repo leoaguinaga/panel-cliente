@@ -6,7 +6,10 @@ La interfaz interna es una herramienta operativa: jerarquía clara, densidad con
 
 ## Typography and surfaces
 
-- Geist Variable es la fuente principal.
+- Misma línea que la landing: Raleway para todo el texto y Bebas Neue (400) solo en los `h1` de página. Se cargan con `next/font` en `app/layout.tsx`.
+- Tema oscuro único: fondo `#18181a`, tarjetas `#1e1e21`, texto `#fffff1`, acento naranja FoxCode `#ee4d31`. Los botones sólidos usan `#c93a20` (blanco encima 5.1:1).
+- La escala `slate` está invertida en `globals.css` (50 = superficie sutil, 950 = texto), así que `text-slate-900` sigue siendo «texto fuerte». `blue-*` apunta al naranja de marca; las escalas de estado (emerald, amber, rose…) tienen 50–300 como tintes oscuros y 700–950 como tonos claros.
+- Para fondos usar `bg-card`/`bg-background`, no `bg-white`. Un bloque destacado usa `.surface-feature` (restaura los slate claros para texto sobre oscuro).
 - Fondos neutros y superficies sobrias; el color se reserva para estados y acciones.
 - Los estados usan texto, icono o etiqueta además de color.
 - Botones, filtros, formularios y tablas comparten el mismo vocabulario visual.

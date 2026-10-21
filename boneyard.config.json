@@ -6,16 +6,18 @@
   ],
   "out": "./src/bones",
   "wait": 800,
-  "color": "#e5e7eb",
-  "darkColor": "#2a2a2a",
+  "color": "#2a2a2e",
+  "darkColor": "#2a2a2e",
   "animate": "shimmer",
-  "shimmerColor": "#f3f4f6",
-  "darkShimmerColor": "#333333",
+  "shimmerColor": "#333338",
+  "darkShimmerColor": "#333338",
   "speed": "2s",
   "transition": 200,
   "routes": [
     "/boneyard-fixtures/project-summary",
     "/boneyard-fixtures/client-portal",
-    "/boneyard-fixtures/product-demos"
+    "/boneyard-fixtures/product-demos",
+    "/boneyard-fixtures/calendar-grid",
+    "/boneyard-fixtures/support-center"
   ]
 }

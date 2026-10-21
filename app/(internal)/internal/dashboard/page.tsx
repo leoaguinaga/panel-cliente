@@ -1,33 +1,85 @@
 import Link from 'next/link';
-import { EmptyState } from '@/components/shared/EmptyState';
-import { StatusBadge } from '@/components/shared/StatusBadge';
-import { formatDate } from '@/lib/formatters';
-import { getOperationalDashboard } from '@/src/modules/dashboard/server/queries';
+import { ArrowRight, CalendarCheck } from 'lucide-react';
+import { requireAuth } from '@/src/lib/auth';
+import { ROLES } from '@/src/modules/auth/server/permissions';
+import { getTodayAgenda } from '@/src/modules/dashboard/server/queries';
 import { getClients } from '@/src/modules/leads/server/queries';
-import { CreateProjectSheet } from '@/components/internal/CreateSheets';
-import { DashboardFilters } from '@/components/internal/DashboardFilters';
+import { getCatalogs } from '@/src/modules/products/server/queries';
+import { getActiveWorkspace } from '@/src/modules/workspaces/server/workspace';
+import { AgendaExtraRow, AgendaGroup } from '@/components/internal/today/AgendaList';
+import { NewMenu } from '@/components/internal/today/NewMenu';
+import { WeekStrip } from '@/components/internal/today/WeekStrip';
+import { formatLongDay, formatWeekday, kindLabels } from '@/components/internal/today/today-items';
 
-type SearchParams = Promise<{ workerId?: string; productId?: string; serviceId?: string; status?: string }>;
-
-export default async function InternalDashboardPage({ searchParams }: { searchParams: SearchParams }) {
-  const filters = await searchParams;
-  const [dashboard, clients] = await Promise.all([getOperationalDashboard(filters), getClients()]);
-  const attentionCount = dashboard.overdueTasks.length + dashboard.blockedTasks.length + dashboard.unassignedProjects.length;
-  return <section className="space-y-7">
-    <header className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm text-muted-foreground">Centro operativo</p><h1 className="text-3xl font-semibold tracking-tight text-balance">Qué necesita atención hoy</h1><p className="mt-1 max-w-2xl text-sm text-muted-foreground">Prioriza vencimientos, bloqueos y responsabilidades antes de revisar el estado general.</p></div><CreateProjectSheet clients={clients} /></header>
-    <nav aria-label="Bandejas de trabajo" className="flex flex-wrap gap-4 text-sm"><Link className="underline" href="/internal/tasks?due=overdue">Todas las tareas vencidas</Link><Link className="underline" href="/internal/tasks?status=BLOCKED">Todas las bloqueadas</Link><Link className="underline" href="/internal/tasks?workerId=unassigned">Tareas sin responsable</Link><Link className="underline" href="/internal/projects?workerId=unassigned">Proyectos sin responsable</Link></nav>
-    <DashboardFilters
-      workers={dashboard.workers}
-      products={dashboard.products}
-      services={dashboard.services}
-      initialFilters={filters}
-    />
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Pendientes de atención" value={attentionCount} description="Vencidas, bloqueadas o sin responsable" tone={attentionCount ? 'urgent' : 'neutral'} /><Metric label="Proyectos activos" value={dashboard.activeProjects} description="En ejecución" /><Metric label="Proyectos pausados" value={dashboard.pausedProjects} description="Requieren decisión para continuar" /><Metric label="Mis tareas abiertas" value={dashboard.myTasks.length} description="Asignadas a tu usuario" /></div>
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(20rem,0.8fr)]"><div className="overflow-hidden rounded-xl border bg-card"><div className="flex items-center justify-between gap-4 border-b px-5 py-4"><div><h2 className="font-semibold">Cola de atención</h2><p className="text-sm text-muted-foreground">Resuelve estos casos antes de planificar trabajo nuevo.</p></div><Link href="/internal/projects" className="text-sm font-medium underline-offset-4 hover:underline">Ver proyectos</Link></div>{attentionCount === 0 ? <EmptyState title="Sin alertas operativas" description="No hay tareas vencidas, bloqueadas ni proyectos sin responsable con estos filtros." /> : <div className="divide-y">{dashboard.overdueTasks.map((task) => <AttentionItem key={task.id} href={`/internal/projects/${task.project.id}`} title={task.title} description={`${task.project.name} · ${task.assignedTo?.name || 'Sin asignar'}`} meta={`Venció ${formatDate(task.dueDate)}`} status="TODO" kind="Vencida" />)}{dashboard.blockedTasks.map((task) => <AttentionItem key={task.id} href={`/internal/projects/${task.project.id}`} title={task.title} description={`${task.project.name} · ${task.assignedTo?.name || 'Sin asignar'}`} meta="Desbloquear o reasignar" status="BLOCKED" kind="Bloqueada" />)}{dashboard.unassignedProjects.map((project) => <AttentionItem key={project.id} href={`/internal/projects/${project.id}`} title={project.name} description={project.client.businessName || project.client.name} meta="Asignar responsable" status={project.status} kind="Sin responsable" />)}</div>}</div><Panel title="Mis próximas tareas" description="Trabajo abierto asignado a ti.">{dashboard.myTasks.length === 0 ? <EmptyState title="No tienes tareas abiertas" description="Las tareas que se te asignen aparecerán aquí." /> : <div className="divide-y">{dashboard.myTasks.map((task) => <Link key={task.id} href={`/internal/projects/${task.project.id}`} className="block px-5 py-3 transition-colors hover:bg-muted/50"><div className="flex items-start justify-between gap-3"><div><p className="font-medium">{task.title}</p><p className="mt-0.5 text-sm text-muted-foreground">{task.project.name}</p></div><StatusBadge status={task.status} /></div><p className="mt-2 text-xs text-muted-foreground">{task.dueDate ? `Vence ${formatDate(task.dueDate)}` : 'Sin fecha límite'}</p></Link>)}</div>}</Panel></div>
-    <div className="grid gap-6 xl:grid-cols-2"><Panel title="Próximas entregas" description="Entregables pendientes ordenados por fecha.">{dashboard.upcomingDeliverables.length === 0 ? <EmptyState title="No hay entregas próximas" description="Los entregables con fecha aparecerán aquí." /> : <div className="divide-y">{dashboard.upcomingDeliverables.map((deliverable) => <Link key={deliverable.id} href={`/internal/projects/${deliverable.project.id}`} className="flex items-center justify-between gap-4 px-5 py-3 hover:bg-muted/50"><div><p className="font-medium">{deliverable.title}</p><p className="text-sm text-muted-foreground">{deliverable.project.name}</p></div><time className="text-sm text-muted-foreground">{formatDate(deliverable.dueDate)}</time></Link>)}</div>}</Panel><Panel title="Carga por responsable" description="Tareas abiertas dentro del alcance filtrado.">{dashboard.workload.length === 0 ? <EmptyState title="Sin carga asignada" description="Asigna tareas para hacer visible la capacidad del equipo." /> : <div className="divide-y">{dashboard.workload.map((worker) => <div key={worker.id} className="flex items-center justify-between px-5 py-3"><p className="font-medium">{worker.name}</p><span className="rounded-full bg-muted px-2.5 py-1 text-sm text-muted-foreground">{worker.openTasks} abiertas</span></div>)}</div>}</Panel></div>
-    <Panel title="Salud de productos" description="Visión resumida de FoxEats, FoxRooms y Contralio."><div className="divide-y">{dashboard.products.map((product) => <Link key={product.id} href={`/internal/projects?productId=${product.id}`} className="grid gap-2 px-5 py-4 transition-colors hover:bg-muted/50 sm:grid-cols-[1fr_auto_auto_auto]"><div><p className="font-medium">{product.name}</p><p className="text-sm text-muted-foreground">{product.projects.length} proyectos asociados</p></div><span className="text-sm text-muted-foreground">{product.activeProjects} activos</span><span className="text-sm text-muted-foreground">{product.pausedProjects} pausados</span><span className="text-sm font-medium">{product.averageProgress}% avance medio</span></Link>)}</div></Panel>
-  </section>;
+function greeting(now = new Date()) {
+  const hour = (now.getUTCHours() + 24 - 5) % 24; // America/Lima
+  return hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches';
 }
-function Metric({ label, value, description, tone = 'neutral' }: { label: string; value: number; description: string; tone?: 'neutral' | 'urgent' }) { return <div className={`rounded-xl border p-4 ${tone === 'urgent' && value ? 'border-red-200 bg-red-50/50' : 'bg-card'}`}><p className="text-sm text-muted-foreground">{label}</p><p className="mt-2 text-2xl font-semibold">{value}</p><p className="mt-1 text-xs text-muted-foreground">{description}</p></div>; }
-function Panel({ title, description, children }: { title: string; description: string; children: React.ReactNode }) { return <div className="overflow-hidden rounded-xl border bg-card"><div className="border-b px-5 py-4"><h2 className="font-semibold">{title}</h2><p className="text-sm text-muted-foreground">{description}</p></div>{children}</div>; }
-function AttentionItem({ href, title, description, meta, status, kind }: { href: string; title: string; description: string; meta: string; status: string; kind: string }) { return <Link href={href} className="flex items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-muted/50"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{title}</p><span className="text-xs text-muted-foreground">{kind}</span></div><p className="mt-1 truncate text-sm text-muted-foreground">{description}</p></div><div className="shrink-0 text-right"><StatusBadge status={status} /><p className="mt-1 text-xs text-muted-foreground">{meta}</p></div></Link>; }
+
+const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
+
+export default async function TodayPage() {
+  const session = await requireAuth([ROLES.ADMIN, ROLES.WORKER]);
+  const isAdmin = session.user.role === ROLES.ADMIN;
+  const [agenda, clients, catalogs, workspace] = await Promise.all([getTodayAgenda(), isAdmin ? getClients() : Promise.resolve([]), isAdmin ? getCatalogs().catch(() => null) : Promise.resolve(null), getActiveWorkspace()]);
+  const firstName = session.user.name?.split(' ')[0] ?? '';
+  const dueNow = agenda.overdue.length + agenda.today.length;
+  const decisionCount = agenda.decisions.length + (agenda.unassignedTasks > 0 ? 1 : 0);
+  const nextUp = agenda.week[0];
+
+  return (
+    <div className="mx-auto max-w-5xl space-y-9">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-3xl font-semibold tracking-tight text-balance">{greeting()}{firstName ? `, ${firstName}` : ''}</h1>
+          <p className="mt-1.5 text-[15px] text-muted-foreground">
+            <span className="text-foreground">{formatLongDay(agenda.date)}</span>
+            {' · '}
+            {dueNow === 0 ? 'No tienes nada pendiente para hoy' : <>Tienes <b className="font-semibold text-foreground">{plural(dueNow, 'pendiente', 'pendientes')}</b>{agenda.overdue.length > 0 && <>, {agenda.overdue.length === 1 ? '1 atrasado' : `${agenda.overdue.length} atrasados`}</>}</>}
+            {isAdmin && decisionCount > 0 && <>. Además, <b className="font-semibold text-foreground">{plural(decisionCount, 'caso espera', 'casos esperan')}</b> tu decisión</>}.
+          </p>
+        </div>
+        {isAdmin && <NewMenu workers={agenda.workers} clients={clients} products={catalogs?.products ?? []} defaultProductId={catalogs?.products.some((product) => product.id === workspace) ? workspace : null} />}
+      </header>
+
+      {dueNow === 0 ? (
+        <div className="flex flex-col items-center gap-1.5 rounded-xl border border-dashed px-6 py-10 text-center">
+          <CalendarCheck aria-hidden className="mb-1 size-6 text-muted-foreground" />
+          <p className="font-heading text-lg font-semibold">Nada pendiente para hoy</p>
+          <p className="text-sm text-muted-foreground">
+            {nextUp ? <>Lo próximo: <Link href="#week-title" className="font-medium text-foreground underline underline-offset-4">{kindLabels[nextUp.kind].toLowerCase()} · {nextUp.title}</Link>, el {formatWeekday(nextUp.date!)} {Number(nextUp.date!.slice(8))}.</> : 'Tampoco hay compromisos con fecha en los próximos 7 días.'}
+          </p>
+        </div>
+      ) : (
+        <div id="hoy" className="scroll-mt-24 space-y-7">
+          <AgendaGroup title="Atrasado" tone="late" items={agenda.overdue} today={agenda.date} />
+          <AgendaGroup title="Hoy" items={agenda.today} today={agenda.date} />
+        </div>
+      )}
+
+      {isAdmin && (
+        <AgendaGroup title="Requiere tu decisión" note="solo administradores" items={agenda.decisions} today={agenda.date}>
+          {agenda.unassignedTasks > 0 && (
+            <AgendaExtraRow
+              href="/internal/tasks?workerId=unassigned"
+              label={plural(agenda.unassignedTasks, 'tarea abierta', 'tareas abiertas')}
+              description="En proyectos activos y sin nadie asignado"
+              action="Repartir tareas"
+            />
+          )}
+        </AgendaGroup>
+      )}
+
+      <WeekStrip today={agenda.date} todayCount={dueNow} items={agenda.week} />
+
+      <footer className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t pt-4 text-[13px] text-muted-foreground">
+        <span className="tabular-nums">
+          {plural(agenda.summary.activeProjects, 'proyecto activo', 'proyectos activos')} · {plural(agenda.summary.pausedProjects, 'pausado', 'pausados')} · {plural(agenda.summary.openTeamTasks, 'tarea abierta', 'tareas abiertas')} en el equipo
+        </span>
+        <Link href="/internal/dashboard/gestion" className="inline-flex items-center gap-1 font-medium text-foreground underline-offset-4 hover:underline">
+          Ver resumen de gestión <ArrowRight aria-hidden className="size-3.5" />
+        </Link>
+      </footer>
+    </div>
+  );
+}

@@ -1,0 +1,10 @@
+export type SupportStatus = 'RECEIVED' | 'IN_PROGRESS' | 'WAITING_CLIENT' | 'RESOLVED';
+export type SupportCategory = 'PROJECT' | 'PROBLEM' | 'DOCUMENTS_PAYMENTS' | 'SECURITY';
+export const statuses: Record<SupportStatus, string> = { RECEIVED: 'Recibida', IN_PROGRESS: 'En atención', WAITING_CLIENT: 'Esperando tu respuesta', RESOLVED: 'Resuelta' };
+export const categories: Record<SupportCategory, string> = { PROJECT: 'Consulta sobre mi proyecto', PROBLEM: 'Reportar un problema', DOCUMENTS_PAYMENTS: 'Documentos y pagos', SECURITY: 'Acceso y seguridad' };
+export type ProjectOption = { id: string; name: string };
+export type Ticket = { id: string; number: number; subject: string; category: SupportCategory; status: SupportStatus; createdAt: string; updatedAt: string; project: ProjectOption | null; client: { id: string; name: string } };
+export type Message = { id: string; body: string; fromTeam: boolean; createdAt: string; originalName: string | null; mimeType: string | null; size: number | null; author: { id: string; name: string } };
+export type TicketDetail = Ticket & { messages: Message[] };
+export type TicketList = { items: Ticket[]; total: number; page: number; pageSize: number };
+export type GuideVote = { guideSlug: string; helpful: boolean };

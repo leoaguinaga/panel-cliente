@@ -4,6 +4,8 @@ import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
+import { getGuide } from "@/src/modules/guides/registry"
+
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -15,7 +17,10 @@ import {
 
 const ROUTE_LABELS: Record<string, string> = {
   internal: "Foxcode",
-  dashboard: "Centro Operativo",
+  dashboard: "Inicio",
+  calendar: "Calendario",
+  support: "Atención al cliente",
+  gestion: "Resumen de gestión",
   projects: "Proyectos",
   clients: "Clientes",
   leads: "Leads",
@@ -25,7 +30,19 @@ const ROUTE_LABELS: Record<string, string> = {
   payments: "Pagos",
   workers: "Colaboradores",
   settings: "Configuración",
+  profile: "Mi perfil",
+  guides: "Guías",
   new: "Nuevo",
+  documentation: "Documentación",
+  kanban: "Kanban",
+  gantt: "Gantt",
+  planning: "Planificación",
+  milestones: "Hitos",
+  requirements: "Requerimientos",
+  scope: "Alcance",
+  contracts: "Contratos",
+  tasks: "Tareas",
+  files: "Archivos",
 }
 
 export function DynamicBreadcrumbs() {
@@ -39,7 +56,10 @@ export function DynamicBreadcrumbs() {
     { label: "Foxcode", href: "/internal/dashboard" },
     ...pathParts.map((segment, index) => {
       const href = `/internal/${pathParts.slice(0, index + 1).join("/")}`
-      const label = ROUTE_LABELS[segment] || (segment.length > 20 ? "Detalle" : segment)
+      const guideTitle = pathParts[index - 1] === "guides" ? getGuide(segment)?.title : undefined
+      // El módulo global se llama «Cobros»; la pestaña del proyecto sigue siendo «Pagos».
+      const moduleLabel = index === 0 && segment === "payments" ? "Cobros" : undefined
+      const label = guideTitle || moduleLabel || ROUTE_LABELS[segment] || (segment.length > 20 ? "Detalle" : segment)
       return { label, href }
     }),
   ]
