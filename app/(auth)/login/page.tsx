@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { getLoginDestination } from '@/src/lib/login-redirect';
 import { authClient } from '@/src/lib/auth-client';
 import styles from '../auth.module.css';
 
@@ -48,19 +49,10 @@ export default function LoginPage() {
         return;
       }
 
-      // Refresh the router to trigger proxy checks.
-      router.refresh();
-
-      // Get user session to determine role-based redirect
       const { data: session } = await authClient.getSession();
       const userRole = (session?.user as { role?: string } | undefined)?.role;
-
-      if (userRole === 'CLIENT') {
-        router.push('/client/dashboard');
-      } else {
-        // ADMIN, WORKER, or any other role goes to internal
-        router.push('/internal/dashboard');
-      }
+      router.replace(getLoginDestination(window.location.search, userRole));
+      router.refresh();
     } catch {
       setError(describeError({}));
       setLoading(false);

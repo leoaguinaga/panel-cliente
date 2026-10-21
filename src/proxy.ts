@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionCookie } from "better-auth/cookies";
+import { getLoginDestination } from "./lib/login-redirect";
 import { ROLES } from "./modules/auth/server/permissions";
 
 // Optimistic check: only looks at the session cookie. Role and status are
@@ -14,8 +15,14 @@ export async function proxy(request: NextRequest) {
   const isAuthRoute = url.pathname === "/login" || url.pathname === "/";
 
   if (isInternalRoute || isClientRoute) {
-    if (hasSessionCookie) return NextResponse.next();
+    if (hasSessionCookie) {
+      const requestHeaders = new Headers(request.headers);
+      requestHeaders.set("x-portal-return-to", `${url.pathname}${url.search}`);
+      return NextResponse.next({ request: { headers: requestHeaders } });
+    }
+    const destination = `${url.pathname}${url.search}`;
     url.pathname = "/login";
+    url.search = new URLSearchParams({ next: destination }).toString();
     return NextResponse.redirect(url);
   }
 
@@ -41,6 +48,5 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  url.pathname = userRole === ROLES.CLIENT ? "/client/dashboard" : "/internal/dashboard";
-  return NextResponse.redirect(url);
+  return NextResponse.redirect(new URL(getLoginDestination(url.search, userRole), request.url));
 }

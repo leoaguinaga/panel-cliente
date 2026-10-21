@@ -1,3 +1,5 @@
+import { headers } from 'next/headers';
+import { getLoginUrl } from './login-redirect';
 import { cache } from 'react';
 import { ROLES, Role } from '../modules/auth/server/permissions';
 import { BackendApiError, backendFetch } from './api/server';
@@ -29,7 +31,7 @@ export async function requireAuth(allowedRoles?: Role[]) {
   const session = await getSession();
 
   if (!session || !session.user) {
-    redirect("/login");
+    redirect(getLoginUrl((await headers()).get("x-portal-return-to")));
   }
 
   const userRole = session.user.role;
@@ -37,7 +39,7 @@ export async function requireAuth(allowedRoles?: Role[]) {
   const validRoles = Object.values(ROLES);
 
   if (!validRoles.includes(userRole as Role) || userStatus !== "ACTIVE") {
-    redirect("/login");
+    redirect(getLoginUrl((await headers()).get("x-portal-return-to")));
   }
 
   if (allowedRoles && !allowedRoles.includes(userRole as Role)) {
