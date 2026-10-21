@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { backendFetch } from '@/src/lib/api/server';
+import { runFormAction } from '@/src/lib/api/form-action';
 
 const value = (formData: FormData, key: string) => String(formData.get(key) || '').trim();
 
@@ -13,6 +14,11 @@ export async function createClientAction(formData: FormData) {
 export async function updateClientAction(id: string, formData: FormData) {
   await backendFetch(`/clients/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: value(formData, 'name'), businessName: value(formData, 'businessName') || null, email: value(formData, 'email') || null, phone: value(formData, 'phone') || null, whatsapp: value(formData, 'whatsapp') || null, documentNumber: value(formData, 'documentNumber') || null, confirmDuplicate: formData.get('confirmDuplicate') === 'on', responsibleWorkerId: value(formData, 'responsibleWorkerId') || null, status: value(formData, 'status') }) });
   revalidatePath('/internal/clients'); revalidatePath(`/internal/clients/${id}`);
+}
+
+/** Para formularios cliente: no se puede pasar `updateClientAction.bind(...)` desde el navegador a runFormAction. */
+export async function saveClientAction(id: string | null, formData: FormData) {
+  return runFormAction(data => id ? updateClientAction(id, data) : createClientAction(data), formData);
 }
 
 export async function convertLeadToClientAction(leadId: string, data?: FormData) {
