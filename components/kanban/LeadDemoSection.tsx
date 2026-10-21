@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useId, useState, type ReactNode } from 'react';
-import { Check, ChevronDown, Copy, ExternalLink, Globe, LayoutDashboard, Plus, RotateCw, Trash2 } from 'lucide-react';
+import { Check, ChevronDown, Copy, ExternalLink, Globe, LayoutDashboard, Plus, RotateCw, Send, Trash2, UserCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -103,12 +103,13 @@ export function LeadDemoSection({
         }}
       />
     );
-  } else if (demo && (demo.provisionStatus === 'READY' || demo.provisionStatus === 'EXPIRED')) {
+  } else if (demo && (demo.provisionStatus === 'READY' || demo.provisionStatus === 'EXPIRED' || demo.provisionStatus === 'CLAIMED')) {
     body = (
       <DemoCard
         demo={demo}
+        lead={lead}
         productName={options.product!.name}
-        canDelete={options.canDelete}
+        isAdmin={options.canDelete}
         onChange={setDemo}
         onDeleted={() => {
           setDemo(null);
@@ -337,22 +338,30 @@ function Choice({ checked, onClick, children }: { checked: boolean; onClick: () 
 
 function DemoCard({
   demo,
+  lead,
   productName,
-  canDelete,
+  isAdmin,
   onChange,
   onDeleted,
 }: {
   demo: ProvisionedDemo;
+  lead: LeadItem;
   productName: string;
-  canDelete: boolean;
+  /** Entregar, reenviar el acceso y eliminar son de ADMIN (D6). */
+  isAdmin: boolean;
   onChange: (demo: ProvisionedDemo) => void;
   onDeleted: () => void;
 }) {
+  const ids = useId();
   const [copied, setCopied] = useState(false);
-  const [busy, setBusy] = useState<'extend' | 'delete' | null>(null);
-  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState<'extend' | 'delete' | 'claim' | null>(null);
+  const [mode, setMode] = useState<'actions' | 'delete' | 'claim'>('actions');
+  const [claimName, setClaimName] = useState(lead.name);
+  const [claimEmail, setClaimEmail] = useState(lead.email ?? '');
+  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const expired = demo.provisionStatus === 'EXPIRED';
+  const claimed = demo.provisionStatus === 'CLAIMED';
   const left = demo.expiresAt ? daysUntil(demo.expiresAt) : null;
 
   const copy = async () => {
@@ -365,9 +374,10 @@ function DemoCard({
     }
   };
 
-  const run = async (kind: 'extend' | 'delete', action: () => Promise<void>) => {
+  const run = async (kind: NonNullable<typeof busy>, action: () => Promise<void>) => {
     setBusy(kind);
     setError(null);
+    setNotice(null);
     try {
       await action();
     } catch (err) {
@@ -377,8 +387,30 @@ function DemoCard({
     }
   };
 
+  const claim = (name: string, email: string) =>
+    run('claim', async () => {
+      const result = await demosApi.claim(demo.id, { name: name.trim(), email: email.trim() });
+      const { accessEmail, ...next } = result;
+      onChange(next);
+      setMode('actions');
+      setNotice(
+        accessEmail === 'failed'
+          ? { ok: false, text: 'Quedó entregada, pero el correo no salió. Usa «Reenviar acceso».' }
+          : { ok: true, text: `Le enviamos a ${next.contactEmail ?? email} un correo para elegir su contraseña.` },
+      );
+    });
+
+  const canClaim = claimName.trim().length >= 2 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(claimEmail.trim());
+
+  let meta: string | null = null;
+  if (claimed) meta = `Entregada · cuenta de ${demo.contactEmail ?? 'su administrador'}`;
+  else if (demo.expiresAt)
+    meta = expired
+      ? `Caducó el ${shortDate(demo.expiresAt)}: la carta dice «Esta demo terminó»`
+      : `${productName} · caduca el ${shortDate(demo.expiresAt)}${left !== null ? ` (${left === 1 ? 'mañana' : `en ${left} días`})` : ''}`;
+
   return (
-    <div className={cn('rounded-xl border bg-card p-3 text-sm', expired && 'border-amber-500/40')}>
+    <div className={cn('rounded-xl border bg-card p-3 text-sm', expired && 'border-amber-500/40', claimed && 'border-emerald-500/40')}>
       <div className="flex items-start gap-3">
         <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground" aria-hidden="true">
           <Globe className="size-5" />
@@ -392,7 +424,7 @@ function DemoCard({
                 expired ? 'bg-amber-500/15 text-amber-400' : 'bg-emerald-500/15 text-emerald-400',
               )}
             >
-              {expired ? 'Caducada' : 'Lista'}
+              {claimed ? 'Entregada' : expired ? 'Caducada' : 'Lista'}
             </span>
           </div>
           {demo.publicUrl && (
@@ -405,17 +437,11 @@ function DemoCard({
               {hostOf(demo.publicUrl)}
             </a>
           )}
-          {demo.expiresAt && (
-            <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-              {expired
-                ? `Caducó el ${shortDate(demo.expiresAt)}: la carta dice «Esta demo terminó»`
-                : `${productName} · caduca el ${shortDate(demo.expiresAt)}${left !== null ? ` (${left === 1 ? 'mañana' : `en ${left} días`})` : ''}`}
-            </p>
-          )}
+          {meta && <p className="mt-0.5 text-[11.5px] text-muted-foreground">{meta}</p>}
         </div>
       </div>
 
-      {confirming ? (
+      {mode === 'delete' && (
         <div role="alertdialog" aria-label="Eliminar demo" className="mt-3 rounded-lg border border-rose-500/40 bg-rose-500/[0.07] p-2.5">
           <p className="text-[13px]">¿Eliminar la demo? Se borra el negocio en {productName}. No se puede deshacer.</p>
           <div className="mt-2 flex gap-1.5">
@@ -433,17 +459,53 @@ function DemoCard({
             >
               {busy === 'delete' ? 'Eliminando…' : 'Eliminar'}
             </Button>
-            <Button type="button" variant="ghost" size="xs" onClick={() => setConfirming(false)} disabled={busy !== null}>
+            <Button type="button" variant="ghost" size="xs" onClick={() => setMode('actions')} disabled={busy !== null}>
               Cancelar
             </Button>
           </div>
         </div>
-      ) : (
+      )}
+
+      {mode === 'claim' && (
+        <div role="group" aria-labelledby={`${ids}-claim`} className="mt-3 space-y-2.5 rounded-lg border border-emerald-500/40 bg-emerald-500/[0.06] p-2.5">
+          <p id={`${ids}-claim`} className="text-[13px]">
+            <span className="font-semibold">Entregar al cliente.</span> Se crea su cuenta de administrador en {productName} con la misma carta y dirección, deja de caducar y empieza su prueba gratuita desde hoy. Le llega un correo para elegir su contraseña.
+          </p>
+          <label className="grid gap-1 text-xs font-semibold text-muted-foreground">
+            Nombre del administrador
+            <input className={inputClass} value={claimName} maxLength={120} onChange={(event) => setClaimName(event.target.value)} autoComplete="off" />
+          </label>
+          <label className="grid gap-1 text-xs font-semibold text-muted-foreground">
+            Correo
+            <input
+              type="email"
+              className={inputClass}
+              value={claimEmail}
+              maxLength={200}
+              onChange={(event) => setClaimEmail(event.target.value)}
+              placeholder="dueño@restaurante.pe"
+              autoComplete="off"
+            />
+          </label>
+          <div className="flex gap-1.5">
+            <Button type="button" size="xs" disabled={!canClaim || busy !== null} onClick={() => claim(claimName, claimEmail)}>
+              {busy === 'claim' ? 'Entregando…' : 'Entregar'}
+            </Button>
+            <Button type="button" variant="ghost" size="xs" onClick={() => setMode('actions')} disabled={busy !== null}>
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {mode === 'actions' && (
         <div className="mt-3 flex flex-wrap gap-1 border-t pt-3">
-          <Button type="button" variant="outline" size="xs" className="gap-1" onClick={copy} disabled={!demo.publicUrl}>
-            {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
-            {copied ? 'Copiado' : 'Copiar'}
-          </Button>
+          {!claimed && (
+            <Button type="button" variant="outline" size="xs" className="gap-1" onClick={copy} disabled={!demo.publicUrl}>
+              {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
+              {copied ? 'Copiado' : 'Copiar'}
+            </Button>
+          )}
           {demo.publicUrl && (
             <Button asChild variant="outline" size="xs" className="gap-1">
               <a href={demo.publicUrl} target="_blank" rel="noopener noreferrer">
@@ -460,37 +522,66 @@ function DemoCard({
               </a>
             </Button>
           )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button type="button" variant={expired ? 'default' : 'outline'} size="xs" className="gap-1" disabled={busy !== null}>
-                {busy === 'extend' ? 'Extendiendo…' : expired ? 'Reactivar' : 'Extender'}
-                <ChevronDown aria-hidden="true" />
+          {claimed ? (
+            isAdmin && (
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                className="gap-1"
+                disabled={busy !== null}
+                onClick={() => claim(demo.contactName ?? lead.name, demo.contactEmail ?? '')}
+              >
+                <Send aria-hidden="true" />
+                {busy === 'claim' ? 'Reenviando…' : 'Reenviar acceso'}
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              {DEMO_DURATIONS.map((days) => (
-                <DropdownMenuItem key={days} onSelect={() => run('extend', async () => onChange(await demosApi.extend(demo.id, days)))}>
-                  {expired ? `${days} días desde hoy` : `+${days} días`}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {canDelete && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              className="ml-auto text-muted-foreground hover:text-rose-400"
-              aria-label="Eliminar demo"
-              onClick={() => setConfirming(true)}
-              disabled={busy !== null}
-            >
-              <Trash2 aria-hidden="true" />
-            </Button>
+            )
+          ) : (
+            <>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant={expired ? 'default' : 'outline'} size="xs" className="gap-1" disabled={busy !== null}>
+                    {busy === 'extend' ? 'Extendiendo…' : expired ? 'Reactivar' : 'Extender'}
+                    <ChevronDown aria-hidden="true" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  {DEMO_DURATIONS.map((days) => (
+                    <DropdownMenuItem key={days} onSelect={() => run('extend', async () => onChange(await demosApi.extend(demo.id, days)))}>
+                      {expired ? `${days} días desde hoy` : `+${days} días`}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {isAdmin && (
+                <>
+                  <Button type="button" size="xs" className="gap-1" onClick={() => setMode('claim')} disabled={busy !== null}>
+                    <UserCheck aria-hidden="true" />
+                    Entregar al cliente
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    className="ml-auto text-muted-foreground hover:text-rose-400"
+                    aria-label="Eliminar demo"
+                    onClick={() => setMode('delete')}
+                    disabled={busy !== null}
+                  >
+                    <Trash2 aria-hidden="true" />
+                  </Button>
+                </>
+              )}
+            </>
           )}
         </div>
       )}
 
+      {notice && (
+        <p role={notice.ok ? 'status' : 'alert'} className={cn('mt-2 text-xs', notice.ok ? 'text-emerald-400' : 'text-amber-400')}>
+          {notice.text}
+        </p>
+      )}
       {error && (
         <p role="alert" className="mt-2 text-xs text-rose-400">
           {error}

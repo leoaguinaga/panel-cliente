@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Copy, Lock, Plus, Trash2, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Copy, Download, Eye, Lock, Plus, Send, Trash2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -49,6 +49,7 @@ export function ProposalEditor({ initial }: { initial: ProposalDetail }) {
   const [busy, setBusy] = useState(false);
   const queue = useRef<Promise<void>>(Promise.resolve());
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const pending = useRef<Record<string, ProposalPatch>>({});
   const readOnly = proposal.status !== 'DRAFT';
 
   /** Los guardados salen en orden; la respuesta no pisa lo que se sigue escribiendo. */
@@ -78,7 +79,21 @@ export function ProposalEditor({ initial }: { initial: ProposalDetail }) {
     if (readOnly) return;
     setProposal((current) => ({ ...current, ...changes }));
     clearTimeout(timers.current[key]);
-    timers.current[key] = setTimeout(() => send(patch), 700);
+    pending.current[key] = patch;
+    timers.current[key] = setTimeout(() => {
+      delete pending.current[key];
+      send(patch);
+    }, 700);
+  };
+
+  /** Manda lo que quedó esperando y espera a que todo esté guardado (antes del PDF o del envío). */
+  const flush = async () => {
+    for (const [key, patch] of Object.entries(pending.current)) {
+      clearTimeout(timers.current[key]);
+      delete pending.current[key];
+      send(patch);
+    }
+    await queue.current;
   };
 
   useEffect(() => {
@@ -102,6 +117,46 @@ export function ProposalEditor({ initial }: { initial: ProposalDetail }) {
     }
   };
 
+  const pdfUrl = `/api/backend/proposals/${proposal.id}/pdf`;
+  const openPdf = async (inline: boolean) => {
+    // La pestaña se abre antes de esperar el guardado: si no, el navegador la bloquea.
+    const tab = inline ? window.open('about:blank', '_blank') : null;
+    await flush();
+    const url = inline ? `${pdfUrl}?inline=1` : pdfUrl;
+    if (tab) tab.location.href = url;
+    else window.location.href = url;
+  };
+
+  const markSent = async () => {
+    setBusy(true);
+    try {
+      await flush();
+      const sent = await call<ProposalDetail>(`/api/backend/proposals/${proposal.id}/send`, { method: 'POST' });
+      setProposal(sent);
+      setSaveState('idle');
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo enviar');
+      setSaveState('error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const markRejected = async (reason: string) => {
+    setBusy(true);
+    try {
+      const rejected = await call<ProposalDetail>(`/api/backend/proposals/${proposal.id}/reject`, { method: 'POST', body: JSON.stringify({ reason: reason.trim() || null }) });
+      setProposal(rejected);
+      setSaveState('idle');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo registrar');
+      setSaveState('error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const remove = async () => {
     setBusy(true);
     try {
@@ -117,6 +172,14 @@ export function ProposalEditor({ initial }: { initial: ProposalDetail }) {
   const business = proposal.lead.companyName || proposal.lead.name;
   const status = PROPOSAL_STATUS[proposal.status];
   const newerVersion = proposal.children[0];
+  // Lo mismo que valida el servidor al enviar.
+  const sendBlocker = !proposal.items.some((item) => item.module.trim())
+    ? 'Agrega al menos un módulo al alcance.'
+    : total <= 0
+      ? 'La propuesta no tiene precio.'
+      : pctSum !== 100
+        ? `Las cuotas suman ${pctSum} %: deben sumar 100 %.`
+        : null;
 
   return (
     <section className="space-y-6">
@@ -164,7 +227,13 @@ export function ProposalEditor({ initial }: { initial: ProposalDetail }) {
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3.5 text-sm">
           <p className="flex items-center gap-2">
             <Lock className="size-4 text-muted-foreground" aria-hidden="true" />
-            {newerVersion ? `Esta versión ya no es la vigente: hay una v${newerVersion.version}.` : 'Así se envió. Para cambiarla se crea una versión nueva y esta queda como estaba.'}
+            {newerVersion
+              ? `Esta versión ya no es la vigente: hay una v${newerVersion.version}.`
+              : proposal.status === 'REJECTED'
+                ? `Rechazada${proposal.rejectedAt ? ` el ${shortDate(proposal.rejectedAt)}` : ''}${proposal.rejectionReason ? `: ${proposal.rejectionReason}` : '.'} Puedes seguir con una versión nueva.`
+                : proposal.status === 'EXPIRED'
+                  ? 'Venció sin respuesta. Crea una versión nueva con fechas al día o márcala como rechazada.'
+                  : `Enviada${proposal.sentAt ? ` el ${shortDate(proposal.sentAt)}` : ''}. Así la recibió el cliente: para cambiarla se crea una versión nueva y esta queda como estaba.`}
           </p>
           {newerVersion ? (
             <Button asChild variant="outline" size="sm">
@@ -249,6 +318,44 @@ export function ProposalEditor({ initial }: { initial: ProposalDetail }) {
             <SummaryRow label="Válida hasta">{proposal.validUntil ? shortDate(proposal.validUntil) : '—'}</SummaryRow>
           </dl>
           {pctSum !== 100 && <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs text-amber-400">Las cuotas suman {pctSum} %: deben sumar 100 % antes de enviarla.</p>}
+          <div className="space-y-2 border-t pt-4">
+            <div className="grid grid-cols-2 gap-2">
+              <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => openPdf(false)} disabled={busy}>
+                <Download className="size-4" aria-hidden="true" />
+                PDF
+              </Button>
+              <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => openPdf(true)} disabled={busy}>
+                <Eye className="size-4" aria-hidden="true" />
+                Vista previa
+              </Button>
+            </div>
+            {proposal.status === 'DRAFT' && (
+              <>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button type="button" size="sm" className="w-full gap-1.5" disabled={busy || Boolean(sendBlocker)}>
+                      <Send className="size-4" aria-hidden="true" />
+                      Marcar enviada
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>¿Marcar {proposalLabel(proposal)} como enviada?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Se guarda el PDF tal como está hoy y ya no se puede editar: los cambios irán en una versión nueva. El lead pasa a «Cotizado» y se agenda un seguimiento en 3 días.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={markSent}>Marcar enviada</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                <p className="text-xs text-muted-foreground">{sendBlocker ?? 'Descarga el PDF, mándalo al cliente y luego márcala como enviada.'}</p>
+              </>
+            )}
+            {(proposal.status === 'SENT' || proposal.status === 'EXPIRED') && !newerVersion && <RejectDialog busy={busy} onConfirm={markRejected} />}
+          </div>
         </aside>
       </div>
     </section>
@@ -640,6 +747,33 @@ function Segmented({ label, value, options, onChange }: { label: string; value: 
         ))}
       </div>
     </div>
+  );
+}
+
+function RejectDialog({ busy, onConfirm }: { busy: boolean; onConfirm: (reason: string) => void }) {
+  const [reason, setReason] = useState('');
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button type="button" variant="ghost" size="sm" className="w-full text-muted-foreground" disabled={busy}>
+          El cliente la rechazó
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Registrar que la rechazó</AlertDialogTitle>
+          <AlertDialogDescription>Queda en el historial del lead. Si luego quieres reintentar, crea una versión nueva.</AlertDialogDescription>
+        </AlertDialogHeader>
+        <label className="block text-[13px] font-medium">
+          Motivo <span className="font-normal text-muted-foreground">(opcional)</span>
+          <textarea rows={3} maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Precio, plazo, se fue con otro proveedor…" className={cn(field, 'mt-1.5 resize-y py-2')} />
+        </label>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction onClick={() => onConfirm(reason)}>Registrar</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 

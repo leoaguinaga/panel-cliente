@@ -36,6 +36,7 @@ export type Proposal = {
   acceptedAt: string | null;
   rejectedAt: string | null;
   rejectionReason: string | null;
+  pdfDocumentId: string | null;
   createdAt: string;
   updatedAt: string;
   preparedBy: { id: string; name: string; email: string; jobTitle: string | null } | null;

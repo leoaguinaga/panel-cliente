@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ChevronDown, FileText, Plus } from 'lucide-react';
+import { ChevronDown, Download, FileText, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { PROPOSAL_STATUS, formatMoney, layerShort, proposalLabel, shortDate } from '@/src/modules/proposals/format';
@@ -95,6 +95,12 @@ function ProposalCard({ proposal, older }: { proposal: Proposal; older: Proposal
             <b className="font-semibold text-foreground tabular-nums">{formatMoney(proposal.total, proposal.currency)}</b> {proposal.taxMode === 'PLUS_IGV' ? '+ IGV' : 'IGV incl.'}
           </dd>
         </div>
+        {proposal.sentAt && (
+          <div>
+            <dt className="inline">Enviada </dt>
+            <dd className="inline text-foreground">{shortDate(proposal.sentAt)}</dd>
+          </div>
+        )}
         {proposal.validUntil && (
           <div>
             <dt className="inline">Válida hasta </dt>
@@ -108,6 +114,12 @@ function ProposalCard({ proposal, older }: { proposal: Proposal; older: Proposal
             <FileText aria-hidden="true" />
             {proposal.status === 'DRAFT' ? 'Seguir editando' : 'Ver propuesta'}
           </Link>
+        </Button>
+        <Button asChild variant="ghost" size="xs" className="gap-1">
+          <a href={`/api/backend/proposals/${proposal.id}/pdf`} download>
+            <Download aria-hidden="true" />
+            PDF
+          </a>
         </Button>
       </div>
       {older.length > 0 && (

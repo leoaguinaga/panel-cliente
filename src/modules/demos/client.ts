@@ -13,6 +13,9 @@ export type ProvisionedDemo = {
   panelUrl: string | null;
   expiresAt: string | null;
   createdAt: string;
+  /** Tras entregarla: el administrador del restaurante. */
+  contactName: string | null;
+  contactEmail: string | null;
 };
 
 export type DemoTemplate = { key: string; name: string; description: string; dishCount?: number };
@@ -61,6 +64,9 @@ export const demosApi = {
     call<ProvisionedDemo>(`/leads/${leadId}/demo`, json('POST', body)),
   refresh: (demoId: string) => call<ProvisionedDemo>(`/product-demos/${demoId}/refresh`, json('POST')),
   extend: (demoId: string, days: number) => call<ProvisionedDemo>(`/product-demos/${demoId}/extend`, json('POST', { days })),
+  /** Entregar al cliente; con una demo ya entregada, reenvía el acceso. */
+  claim: (demoId: string, body: { name: string; email: string }) =>
+    call<ProvisionedDemo & { accessEmail: 'sent' | 'failed' | null }>(`/product-demos/${demoId}/claim`, json('POST', body)),
   remove: (demoId: string) => call<ProvisionedDemo>(`/product-demos/${demoId}`, json('DELETE')),
 
   connection: (productId: string) => call<DemoApiConnection>(`/catalogs/products/${productId}/demo-api`),

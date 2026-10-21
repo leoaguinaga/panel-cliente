@@ -49,6 +49,14 @@ export function LeadKanban({
   initialLeadId?: string;
 }) {
   const [leads, setLeads] = useState<LeadItem[]>(initialLeads);
+  const [syncedLeads, setSyncedLeads] = useState(initialLeads);
+  // Las acciones revalidan la página sin desmontar el tablero. Adoptar la
+  // nueva lista del servidor conserva el panel abierto y los cambios locales
+  // mientras no haya una nueva respuesta del servidor.
+  if (syncedLeads !== initialLeads) {
+    setSyncedLeads(initialLeads);
+    setLeads(initialLeads);
+  }
   const [isPending, startTransition] = useTransition();
 
 
