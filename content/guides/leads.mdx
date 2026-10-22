@@ -1,4 +1,4 @@
-{/* Fuentes: components/kanban/LeadSheet.tsx, components/kanban/LeadKanban.tsx, backend/src/modules/leads/leads.service.ts, backend/src/modules/dashboard/dashboard.service.ts (getToday) */}
+{/* Fuentes: components/kanban/LeadSheet.tsx, components/kanban/LeadKanban.tsx, components/leads/LeadDetailView.tsx, components/leads/LeadMeetings.tsx, backend/src/modules/leads/leads.service.ts, backend/src/modules/dashboard/dashboard.service.ts (getToday) */}
 
 ## Para qué sirve
 
@@ -90,11 +90,17 @@ Al hacer clic en una tarjeta se abre una hoja lateral con todo lo necesario para
 | Notas | Texto libre; se guarda al salir del campo |
 | Datos | Nombre, contacto, teléfono, correo, enlace de la maqueta |
 
-Abajo, **Ver ficha completa** abre la página del lead con su historial. El indicador del pie muestra si el último cambio se guardó o falló.
+Abajo, **Ver ficha completa** abre la página del lead. El indicador del pie muestra si el último cambio se guardó o falló.
+
+## Ficha completa y reuniones
+
+La ficha muestra lo mismo que el panel, a página completa: a la izquierda el trabajo con el prospecto (siguiente paso, reuniones, propuestas, demo, notas) y a la derecha el contacto, sus datos y **Convertir en cliente** (con proyecto o solo cliente).
+
+**Agendar reunión** abre el formulario en la sección *Reuniones*: día, hora de Lima, duración, responsable e invitados (el correo del lead ya viene puesto). Al guardar se crea la reunión en el calendario del equipo y, con Google Calendar conectado, el evento con su enlace de **Meet** y la invitación por correo. Un lead *Nuevo* o *Contactado* pasa a *Reunión agendada*. Si Google no está conectado o falló, la reunión queda con **Crear Meet** para generarlo después; ahí también aparecen las reuniones pedidas desde la agenda de la landing.
 
 ## Ganar un lead
 
-Al pasar un lead a **Ganado** se abre el diálogo **Crear cliente y proyecto**. Eliges el tipo de proyecto (se sugiere según el tipo de lead), el nombre, el precio y el responsable.
+Al pasar un lead a **Ganado** se abre el diálogo **Crear cliente y proyecto**. Eliges el tipo de proyecto (se sugiere según el tipo de lead), el nombre, el precio con su moneda (USD o PEN) y el responsable.
 
 <Carriles
   titulo="Del primer contacto al proyecto"

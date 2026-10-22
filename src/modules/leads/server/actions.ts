@@ -91,11 +91,11 @@ export async function markLeadAsLostAction(id: string, formData?: FormData) {
   await changeLeadStatusAction(id, 'LOST', reason || null);
 }
 
-export async function convertLeadToProjectAction(leadId: string, projectName?: string, price?: number, responsibleWorkerId?: string | null, projectType?: string) {
+export async function convertLeadToProjectAction(leadId: string, projectName?: string, price?: number, responsibleWorkerId?: string | null, projectType?: string, currency?: string) {
   const res = await backendFetch<{ success: boolean; project: { id: string } }>(`/leads/${leadId}/convert`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ projectName, price, responsibleWorkerId, projectType }),
+    body: JSON.stringify({ projectName, price, currency, responsibleWorkerId, projectType }),
   });
   refresh(leadId);
   return res;

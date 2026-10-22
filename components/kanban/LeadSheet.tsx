@@ -34,21 +34,21 @@ export const LEAD_COLUMNS: Array<KanbanColumnDef & { inbound?: boolean }> = [
   { id: 'LOST', title: 'Rechazado', dot: 'bg-rose-400' },
 ];
 
-const stageTitle = (status: string) => LEAD_COLUMNS.find((col) => col.id === status)?.title ?? status;
+export const stageTitle = (status: string) => LEAD_COLUMNS.find((col) => col.id === status)?.title ?? status;
 
 /** Camino de prospección propia y camino de entrada (landing, referidos). */
 const OUTBOUND_PATH = ['MAPPED', 'SITE_DEVELOPMENT', 'PRESENTED', 'FEEDBACK_CHANGES', 'WON'];
 const INBOUND_PATH = ['NEW', 'CONTACTED', 'MEETING_SCHEDULED', 'PRESENTED', 'QUOTED', 'FEEDBACK_CHANGES', 'WON'];
 
-function stagePathFor(lead: LeadItem) {
+export function stagePathFor(lead: LeadItem) {
   if (OUTBOUND_PATH.includes(lead.status) && !INBOUND_PATH.includes(lead.status)) return OUTBOUND_PATH;
   if (INBOUND_PATH.includes(lead.status) && !OUTBOUND_PATH.includes(lead.status)) return INBOUND_PATH;
   return lead.source ? INBOUND_PATH : OUTBOUND_PATH;
 }
 
-const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const;
+export const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const;
 
-const LEAD_TYPE_OPTIONS = [
+export const LEAD_TYPE_OPTIONS = [
   { value: 'LANDING', label: 'Sitio web / landing' },
   { value: 'SYSTEM', label: 'Software a medida' },
   { value: 'APP', label: 'Aplicación móvil' },
@@ -65,7 +65,7 @@ const dayLabelFormat = new Intl.DateTimeFormat('es-PE', { weekday: 'short', day:
 
 /** YYYY-MM-DD del día en Lima. */
 export const limaDayKey = (value: Date | string) => limaKeyFormat.format(new Date(value));
-const addDays = (key: string, days: number) => {
+export const addDays = (key: string, days: number) => {
   const date = new Date(`${key}T12:00:00Z`);
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
@@ -73,7 +73,7 @@ const addDays = (key: string, days: number) => {
 const daysBetween = (from: string, to: string) => Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000);
 // Mediodía de Lima: el día no se corre al convertir a UTC (igual que en la ficha).
 const keyToIso = (key: string) => `${key}T12:00:00-05:00`;
-const shortDay = (key: string) => dayLabelFormat.format(new Date(`${key}T12:00:00Z`)).replaceAll('.', '');
+export const shortDay = (key: string) => dayLabelFormat.format(new Date(`${key}T12:00:00Z`)).replaceAll('.', '');
 
 /** Días hasta el siguiente paso (negativo = vencido); null si no hay fecha. */
 export function nextActionDays(lead: Pick<LeadItem, 'nextActionAt'>, today = limaDayKey(new Date())) {
@@ -88,16 +88,16 @@ function relativeDay(key: string, today: string) {
 
 /* ---------- Contacto ---------- */
 
-const hrefFor = (url: string) => (url.startsWith('http') ? url : `https://${url}`);
+export const hrefFor = (url: string) => (url.startsWith('http') ? url : `https://${url}`);
 
-function whatsappNumber(phone: string | null) {
+export function whatsappNumber(phone: string | null) {
   let digits = (phone ?? '').replace(/\D/g, '');
   // Celular peruano sin código de país.
   if (digits.length === 9 && digits.startsWith('9')) digits = `51${digits}`;
   return digits.length >= 8 ? digits : null;
 }
 
-function whatsappText(lead: LeadItem) {
+export function whatsappText(lead: LeadItem) {
   const business = lead.companyName || lead.name;
   const greeting = lead.name && lead.name !== lead.companyName ? `Hola ${lead.name.split(' ')[0]}` : 'Hola';
   return lead.previewUrl
@@ -105,10 +105,64 @@ function whatsappText(lead: LeadItem) {
     : `${greeting}, te escribo de FoxCode. Queríamos conversar sobre la web de ${business}.`;
 }
 
+/** Guardado optimista compartido por el panel lateral y la ficha completa. */
+export function useLeadEditor(
+  lead: LeadItem,
+  onLocalChange: (id: string, changes: Partial<LeadItem>) => void,
+  onWon?: (lead: LeadItem) => void,
+) {
+  const [saveState, setSaveState] = useState<SaveState>('idle');
+  const [error, setError] = useState<string | null>(null);
+
+  /** Cambio optimista: se muestra al instante y se revierte si el servidor falla. */
+  const persist = async (changes: Partial<LeadItem>, call: () => Promise<unknown>) => {
+    const previous = Object.fromEntries(Object.keys(changes).map((key) => [key, lead[key as keyof LeadItem]])) as Partial<LeadItem>;
+    onLocalChange(lead.id, changes);
+    setSaveState('saving');
+    setError(null);
+    try {
+      await call();
+      setSaveState('saved');
+      return true;
+    } catch (err) {
+      onLocalChange(lead.id, previous);
+      setSaveState('error');
+      setError(err instanceof Error ? err.message : 'No se pudo guardar el cambio');
+      return false;
+    }
+  };
+
+  const patch = (changes: Partial<LeadItem>, body: LeadPatch) => persist(changes, () => patchLeadAction(lead.id, body));
+
+  const moveTo = (status: string) => {
+    if (status === lead.status) return;
+    void persist({ status, lostReason: null }, () => changeLeadStatusAction(lead.id, status));
+    if (status === 'WON') onWon?.({ ...lead, status });
+  };
+
+  const markLost = (reason: string) => persist({ status: 'LOST', lostReason: reason || null }, () => changeLeadStatusAction(lead.id, 'LOST', reason || null));
+
+  const setNextDate = (key: string | null) => {
+    void patch({ nextActionAt: key ? keyToIso(key) : null }, { nextActionAt: key ? keyToIso(key) : null });
+  };
+
+  const logContact = () => {
+    const now = new Date().toISOString();
+    void patch({ lastContactAt: now }, { lastContactAt: now });
+  };
+
+  const completeStep = () => {
+    const now = new Date().toISOString();
+    void patch({ nextActionAt: null, nextActionNote: null, lastContactAt: now }, { nextActionAt: null, nextActionNote: null, lastContactAt: now });
+  };
+
+  return { saveState, error, persist, patch, moveTo, markLost, setNextDate, logContact, completeStep };
+}
+
 /* ---------- Panel ---------- */
 
 type Worker = { id: string; name: string };
-type SaveState = 'idle' | 'saving' | 'saved' | 'error';
+export type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 export function LeadSheet({
   lead,
@@ -154,57 +208,19 @@ function LeadSheetBody({
   onConvert: (lead: LeadItem) => void;
 }) {
   const today = limaDayKey(new Date());
-  const [saveState, setSaveState] = useState<SaveState>('idle');
-  const [error, setError] = useState<string | null>(null);
   const [losing, setLosing] = useState(false);
   const [rescheduling, setRescheduling] = useState(false);
   const [dataOpen, setDataOpen] = useState(false);
   const previewInputRef = useRef<HTMLInputElement>(null);
-
-  /** Cambio optimista: se muestra al instante y se revierte si el servidor falla. */
-  const persist = async (changes: Partial<LeadItem>, call: () => Promise<unknown>) => {
-    const previous = Object.fromEntries(Object.keys(changes).map((key) => [key, lead[key as keyof LeadItem]])) as Partial<LeadItem>;
-    onLocalChange(lead.id, changes);
-    setSaveState('saving');
-    setError(null);
-    try {
-      await call();
-      setSaveState('saved');
-      return true;
-    } catch (err) {
-      onLocalChange(lead.id, previous);
-      setSaveState('error');
-      setError(err instanceof Error ? err.message : 'No se pudo guardar el cambio');
-      return false;
-    }
-  };
-
-  const patch = (changes: Partial<LeadItem>, body: LeadPatch) => persist(changes, () => patchLeadAction(lead.id, body));
-
-  const moveTo = (status: string) => {
-    if (status === lead.status) return;
-    void persist({ status, lostReason: null }, () => changeLeadStatusAction(lead.id, status));
-    if (status === 'WON') onConvert({ ...lead, status });
-  };
+  const { saveState, error, patch, moveTo, markLost: markLostAs, setNextDate: saveNextDate, logContact, completeStep } = useLeadEditor(lead, onLocalChange, onConvert);
 
   const markLost = async (reason: string) => {
-    const ok = await persist({ status: 'LOST', lostReason: reason || null }, () => changeLeadStatusAction(lead.id, 'LOST', reason || null));
-    if (ok) setLosing(false);
+    if (await markLostAs(reason)) setLosing(false);
   };
 
   const setNextDate = (key: string | null) => {
     setRescheduling(false);
-    void patch({ nextActionAt: key ? keyToIso(key) : null }, { nextActionAt: key ? keyToIso(key) : null });
-  };
-
-  const logContact = () => {
-    const now = new Date().toISOString();
-    void patch({ lastContactAt: now }, { lastContactAt: now });
-  };
-
-  const completeStep = () => {
-    const now = new Date().toISOString();
-    void patch({ nextActionAt: null, nextActionNote: null, lastContactAt: now }, { nextActionAt: null, nextActionNote: null, lastContactAt: now });
+    saveNextDate(key);
   };
 
   const addPreview = () => {
@@ -442,9 +458,9 @@ function LeadSheetBody({
 
 /* ---------- Piezas ---------- */
 
-const chip = 'inline-flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-0.5 text-xs font-semibold text-muted-foreground';
+export const chip = 'inline-flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-0.5 text-xs font-semibold text-muted-foreground';
 
-function SectionLabel({ id, hint, children }: { id: string; hint?: string; children: ReactNode }) {
+export function SectionLabel({ id, hint, children }: { id: string; hint?: string; children: ReactNode }) {
   return (
     <h3 id={id} className="mb-2 flex items-baseline justify-between text-[11px] font-bold uppercase tracking-[0.07em] text-muted-foreground">
       {children}
@@ -453,7 +469,7 @@ function SectionLabel({ id, hint, children }: { id: string; hint?: string; child
   );
 }
 
-function ChipMenu({
+export function ChipMenu({
   label,
   ariaLabel,
   icon,
@@ -499,7 +515,7 @@ function ChipMenu({
   );
 }
 
-function NextStepEditor({
+export function NextStepEditor({
   lead,
   today,
   onDate,
@@ -599,7 +615,7 @@ function NextStepEditor({
   );
 }
 
-function LostForm({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: (reason: string) => void }) {
+export function LostForm({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: (reason: string) => void }) {
   const [reason, setReason] = useState<string | null>(null);
   const [detail, setDetail] = useState('');
   const full = [reason, detail.trim()].filter(Boolean).join(': ');
@@ -645,7 +661,7 @@ function LostForm({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: (r
   );
 }
 
-function ContactButton({ href, external, icon, label, detail, missing }: { href: string | null; external?: boolean; icon: ReactNode; label: string; detail: string | null; missing: string }) {
+export function ContactButton({ href, external, icon, label, detail, missing }: { href: string | null; external?: boolean; icon: ReactNode; label: string; detail: string | null; missing: string }) {
   const body = (
     <>
       {icon}
@@ -672,7 +688,7 @@ function ContactButton({ href, external, icon, label, detail, missing }: { href:
   );
 }
 
-function WhatsAppIcon() {
+export function WhatsAppIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="size-4 text-[#25d366]">
       <path d="M12 2a10 10 0 0 0-8.7 15l-1.3 5 5.1-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.3-.7-2.8-1.1-4.5-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.9s.7-2.1 1-2.4c.3-.3.6-.3.8-.3h.6c.2 0 .4 0 .6.5l.8 2c.1.2.1.4 0 .5l-.4.6-.4.4c-.1.2-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.4 2.4 1.5.3.1.5.1.6-.1l.9-1c.2-.3.4-.2.7-.1l1.9.9c.3.1.5.2.5.3.1.2.1.7-.1 1.3Z" />
@@ -680,7 +696,7 @@ function WhatsAppIcon() {
   );
 }
 
-function PreviewCard({ name, url }: { name: string; url: string }) {
+export function PreviewCard({ name, url }: { name: string; url: string }) {
   const [copied, setCopied] = useState(false);
   const href = hrefFor(url);
   const host = href.replace(/^https?:\/\//, '').replace(/\/$/, '');
@@ -718,7 +734,7 @@ function PreviewCard({ name, url }: { name: string; url: string }) {
   );
 }
 
-function NotesField({ value, onSave, labelledBy }: { value: string | null; onSave: (value: string | null) => void; labelledBy: string }) {
+export function NotesField({ value, onSave, labelledBy }: { value: string | null; onSave: (value: string | null) => void; labelledBy: string }) {
   const [draft, setDraft] = useState(value ?? '');
   return (
     <textarea
@@ -738,7 +754,7 @@ function NotesField({ value, onSave, labelledBy }: { value: string | null; onSav
 
 const dataField = 'mt-1 block h-8 w-full rounded-lg border bg-background px-2.5 text-[13px] font-normal text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
-function LeadDataForm({
+export function LeadDataForm({
   lead,
   open,
   onOpenChange,
@@ -838,7 +854,7 @@ function LeadDataForm({
   );
 }
 
-function SaveStatus({ state, error }: { state: SaveState; error: string | null }) {
+export function SaveStatus({ state, error }: { state: SaveState; error: string | null }) {
   return (
     <span role="status" aria-live="polite" className="flex min-w-0 items-center gap-1.5 text-[11.5px] text-muted-foreground">
       {state === 'saving' && 'Guardando…'}

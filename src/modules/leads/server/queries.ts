@@ -1,4 +1,4 @@
-import type { Lead, Worker, Client } from '@/src/lib/api/contracts';
+import type { Lead, LeadDetail, Worker, Client } from '@/src/lib/api/contracts';
 import { allPages } from '@/src/lib/api/pagination';
 import { backendFetch } from '@/src/lib/api/server';
 
@@ -13,7 +13,7 @@ export async function getLeads(filters?: { status?: string; type?: string; prior
 }
 
 export async function getLeadById(id: string) {
-  return backendFetch<Lead>(`/leads/${id}`);
+  return backendFetch<LeadDetail>(`/leads/${id}`);
 }
 
 export async function getWorkers() {

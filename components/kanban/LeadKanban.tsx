@@ -66,6 +66,7 @@ export function LeadKanban({
   const [convertProjectName, setConvertProjectName] = useState('');
   const [convertProjectType, setConvertProjectType] = useState('WEBSITE');
   const [convertPrice, setConvertPrice] = useState('1500');
+  const [convertCurrency, setConvertCurrency] = useState<'USD' | 'PEN'>('USD');
   const [convertWorkerId, setConvertWorkerId] = useState('');
   const [convertSuccess, setConvertSuccess] = useState<string | null>(null);
   const [convertError, setConvertError] = useState<string | null>(null);
@@ -90,6 +91,7 @@ export function LeadKanban({
     setConvertProjectType(defaultProjectTypeForLead(lead.type));
     setConvertProjectName('');
     setConvertWorkerId(lead.assignedTo?.id || '');
+    setConvertCurrency('USD');
     setConvertModalOpen(true);
   };
 
@@ -123,7 +125,8 @@ export function LeadKanban({
           convertProjectName,
           Number(convertPrice) || 0,
           convertWorkerId || null,
-          convertProjectType
+          convertProjectType,
+          convertCurrency
         );
         if (res?.project?.id) {
           setConvertSuccess(
@@ -273,18 +276,30 @@ export function LeadKanban({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-sm font-medium">
-                    Precio Total Acordado (USD)
+                  <label htmlFor="convert-price" className="mb-1 block text-sm font-medium">
+                    Precio Total Acordado
                   </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    required
-                    value={convertPrice}
-                    onChange={(e) => setConvertPrice(e.target.value)}
-                    className="w-full rounded-lg border bg-background px-2.5 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  />
+                  <div className="flex gap-1.5">
+                    <input
+                      id="convert-price"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      required
+                      value={convertPrice}
+                      onChange={(e) => setConvertPrice(e.target.value)}
+                      className="min-w-0 flex-1 rounded-lg border bg-background px-2.5 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                    <select
+                      aria-label="Moneda del precio"
+                      value={convertCurrency}
+                      onChange={(e) => setConvertCurrency(e.target.value as 'USD' | 'PEN')}
+                      className="rounded-lg border bg-background px-2 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <option value="USD">USD</option>
+                      <option value="PEN">PEN</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div>
