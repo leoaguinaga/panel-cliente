@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 import createMDX from '@next/mdx';
 import { config } from 'dotenv';
-import path from 'node:path';
 
 // Better Auth debe consultar exactamente la misma base que Nest. Next puede
 // cargar el .env raíz antes de este archivo, por lo que DATABASE_URL se fija
@@ -15,7 +14,6 @@ config({ path: '../.env', override: false, quiet: true });
 const nextConfig: NextConfig = {
   ...(process.env.TEST_DATABASE_URL ? { distDir: ".next-calendar-review" } : {}),
   serverExternalPackages: ['@prisma/client', 'prisma', 'better-auth'],
-  outputFileTracingRoot: path.join(__dirname, '..'),
 };
 
 // Las guías internas (content/guides/*.mdx) se importan como componentes.
