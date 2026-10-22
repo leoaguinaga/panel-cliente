@@ -18,7 +18,7 @@ export async function proxyBackend(request: Request, path: string) {
       cache: 'no-store', redirect: 'manual', signal: AbortSignal.timeout(60_000),
     } as RequestInit);
     const output = new Headers();
-    for (const name of ['content-type', 'content-disposition', 'location', 'x-content-type-options', 'content-security-policy', 'referrer-policy']) {
+    for (const name of ['content-type', 'content-disposition', 'location', 'x-content-type-options', 'content-security-policy', 'referrer-policy', 'x-robots-tag']) {
       const value = response.headers.get(name); if (value) output.set(name, value);
     }
     for (const cookie of response.headers.getSetCookie()) output.append('set-cookie', cookie);

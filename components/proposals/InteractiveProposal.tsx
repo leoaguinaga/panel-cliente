@@ -11,6 +11,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { RejectDialog, SummaryRow } from '@/components/proposals/ProposalEditor';
+import { ProposalShares } from '@/components/proposals/ProposalShares';
 import { PROPOSAL_STATUS, formatMoney, proposalLabel, shortDate, stagePctSum, taxBreakdown, totalWeeks } from '@/src/modules/proposals/format';
 import type { ProposalDetail } from '@/src/modules/proposals/types';
 import { htmlUrl, uploadProposalHtml } from '@/src/modules/proposals/upload';
@@ -77,6 +78,14 @@ export function InteractiveProposal({ initial }: { initial: ProposalDetail }) {
       const sent = await call<ProposalDetail>(`/api/backend/proposals/${proposal.id}/send`, { method: 'POST' });
       router.refresh();
       return sent;
+    });
+
+  /** Compartir puede enviar el borrador: se vuelve a leer para ver el estado nuevo. */
+  const reload = () =>
+    run(async () => {
+      const fresh = await call<ProposalDetail>(`/api/backend/proposals/${proposal.id}`);
+      router.refresh();
+      return fresh;
     });
 
   const markRejected = (reason: string) => run(() => call<ProposalDetail>(`/api/backend/proposals/${proposal.id}/reject`, { method: 'POST', body: JSON.stringify({ reason: reason.trim() || null }) }));
@@ -236,30 +245,30 @@ export function InteractiveProposal({ initial }: { initial: ProposalDetail }) {
               </Button>
               <input ref={fileInput} type="file" accept=".html,text/html" className="sr-only" tabIndex={-1} aria-hidden="true" onChange={(event) => replace(event.target.files?.[0])} />
             </div>
+          </div>
+          <div className="space-y-2 border-t pt-4">
+            <ProposalShares proposalId={proposal.id} draft={draft} canShare={(draft || proposal.status === 'SENT') && !newerVersion} onChanged={reload} />
             {draft && (
-              <>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button type="button" size="sm" className="w-full gap-1.5" disabled={busy}>
-                      <Send className="size-4" aria-hidden="true" />
-                      Marcar enviada
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>¿Marcar {proposalLabel(proposal)} como enviada?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Esta versión queda congelada con el HTML de hoy: los cambios irán en una versión nueva. El lead pasa a «Cotizado» y se agenda un seguimiento en 3 días.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction onClick={markSent}>Marcar enviada</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-                <p className="text-xs text-muted-foreground">Por ahora: descarga el HTML, mándalo al cliente y márcala como enviada. Pronto se compartirá con un enlace del panel.</p>
-              </>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button type="button" variant="ghost" size="sm" className="w-full gap-1.5 text-muted-foreground" disabled={busy}>
+                    <Send className="size-4" aria-hidden="true" />
+                    La mandé por otro medio
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>¿Marcar {proposalLabel(proposal)} como enviada?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Para cuando mandaste el HTML como archivo. Esta versión queda congelada: los cambios irán en una versión nueva. El lead pasa a «Cotizado» y se agenda un seguimiento en 3 días.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={markSent}>Marcar enviada</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             )}
             {(proposal.status === 'SENT' || proposal.status === 'EXPIRED') && !newerVersion && <RejectDialog busy={busy} onConfirm={markRejected} />}
           </div>

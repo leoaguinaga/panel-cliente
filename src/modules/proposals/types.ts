@@ -63,6 +63,17 @@ export type ProposalManifest = {
   sections: { id: string; label: string }[];
 };
 
+export type ProposalShare = {
+  id: string;
+  version: number;
+  label: string | null;
+  hasPin: boolean;
+  openCount: number;
+  lastOpenedAt: string | null;
+  revokedAt: string | null;
+  createdAt: string;
+};
+
 export type ProposalDetail = Proposal & {
   lead: { id: string; name: string; companyName: string | null; email: string | null; phone: string | null; status: string; product: { id: string; name: string } | null };
   children: { id: string; version: number }[];
