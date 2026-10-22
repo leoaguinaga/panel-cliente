@@ -17,7 +17,8 @@ const preview: Record<ProjectSite['ogStatus'], { label: string; tone: string }> 
 /** Único enlace del proyecto que ve el cliente; staging, API, etc. van como adjuntos de entregables. */
 export function ProjectSiteManager({ projectId, projectStatus, site: initial }: { projectId: string; projectStatus: string; site: ProjectSite | null }) {
   const [site, setSite] = useState(initial);
-  const [editing, setEditing] = useState(!initial);
+  // En planificación todavía no hay qué mostrar: el formulario espera a que lo pidan
+  const [editing, setEditing] = useState(!initial && projectStatus !== 'PLANNING');
   const [kind, setKind] = useState<'LIVE' | 'DEMO'>(initial?.kind ?? 'DEMO');
   const [pending, startTransition] = useTransition();
   // Al entregar el proyecto, la demo debería dar paso al sitio en vivo
@@ -46,6 +47,7 @@ export function ProjectSiteManager({ projectId, projectStatus, site: initial }: 
     <div className="flex flex-wrap items-baseline justify-between gap-3">
       <div><h3 id="site-card-title" className="text-sm font-bold text-slate-900">Enlace del proyecto</h3><p className="mt-1 text-xs text-slate-500">Lo que el cliente abre desde su inicio: el sitio en vivo o la demo. Staging, API y similares van como adjuntos de los entregables.</p></div>
       {site && !editing && <button type="button" onClick={() => { setKind(site.kind); setEditing(true); }} className="text-xs font-semibold text-slate-600 hover:text-slate-900">Editar</button>}
+      {!site && !editing && <button type="button" onClick={() => setEditing(true)} className="text-xs font-semibold text-slate-600 hover:text-slate-900">Agregar enlace</button>}
     </div>
 
     {suggestLive && !editing && <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-orange-200 bg-orange-50 p-3 text-sm">
@@ -60,7 +62,7 @@ export function ProjectSiteManager({ projectId, projectStatus, site: initial }: 
       <label className="block text-xs font-semibold text-slate-700">URL<input name="url" type="url" required maxLength={2000} placeholder="https://demo.acme.pe" defaultValue={site?.url ?? ''} className={field} /></label>
       <label className="block text-xs font-semibold text-slate-700">Nota para el cliente <span className="font-normal text-slate-500">(opcional, nunca contraseñas)</span><textarea name="comment" rows={2} maxLength={500} placeholder="Datos de prueba: las reservas no llegan al restaurante." defaultValue={site?.comment ?? ''} className={field} /></label>
       <div className="flex flex-wrap justify-end gap-2">
-        {site && <button type="button" disabled={pending} onClick={() => setEditing(false)} className="min-h-11 rounded-xl border px-4 text-sm font-semibold text-slate-700 hover:bg-slate-100">Cancelar</button>}
+        {(site || projectStatus === 'PLANNING') && <button type="button" disabled={pending} onClick={() => setEditing(false)} className="min-h-11 rounded-xl border px-4 text-sm font-semibold text-slate-700 hover:bg-slate-100">Cancelar</button>}
         <button type="submit" disabled={pending} className="min-h-11 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-60">{pending ? 'Guardando…' : 'Guardar enlace'}</button>
       </div>
     </form> : site && <div className="mt-4 grid gap-4 sm:grid-cols-[14rem_1fr]">
@@ -79,5 +81,6 @@ export function ProjectSiteManager({ projectId, projectStatus, site: initial }: 
         </div>
       </div>
     </div>}
+    {!site && !editing && <p className="mt-3 text-sm text-slate-600">Todavía no hay enlace. Agrégalo cuando haya una demo que mostrar.</p>}
   </article>;
 }

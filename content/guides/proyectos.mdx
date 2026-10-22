@@ -1,0 +1,150 @@
+{/* Fuentes: frontend/src/modules/projects/setup-steps.ts, backend/src/modules/proposals/conversion/proposal-conversion.service.ts, backend/src/modules/projects/milestone-status.ts, milestone-flow.service.ts, task-rules.ts (resolveTaskMilestone), progress.ts, components/projects/MilestoneManager.tsx, components/projects/TaskDrawer.tsx, components/client/ClientMilestoneDecision.tsx */}
+
+## Para qué sirve
+
+Un proyecto nace cuando el cliente acepta la propuesta (o cuando un lead se marca como ganado). Esta guía explica qué hacer desde ese momento hasta cobrar cada entrega: cómo se arma el trabajo, cuándo avanza solo y qué decide el cliente.
+
+Si la propuesta se convirtió en proyecto, el sistema ya dejó cargado:
+
+- el **alcance**: qué incluye, qué no y los supuestos;
+- los **hitos**, con sus fechas y visibles para el cliente;
+- las **cuotas de pago**: la de la firma queda *Por cobrar* a 5 días y las demás, *Programadas* y atadas a su hito;
+- el **PDF de la propuesta**, en los documentos del proyecto.
+
+## Primeros pasos
+
+En el **Resumen** del proyecto, la tarjeta *Siguiente paso* muestra esta lista y marca cada paso sola cuando detecta que está hecho. Siempre resalta uno solo: el próximo. Cuando todo está listo, la tarjeta desaparece.
+
+<Pasos>
+
+1. **Asignar responsable** (en *Ajustes*). Mientras no tenga, el proyecto aparece en «Requiere tu decisión» del Inicio de los admin.
+2. **Revisar el alcance.** Que diga lo mismo que se vendió. Es la referencia cuando el cliente pida algo extra.
+3. **Revisar los hitos.** Cada hito debe tener fecha de entrega. Revisa también sus entregables y la cuota que tiene atada.
+4. **Cargar requerimientos** y asignar cada uno a un hito.
+5. **Crear las tareas** de cada requerimiento, con responsable, revisor y horas estimadas.
+6. **Subir los documentos base**: el contrato firmado y lo que mandó el cliente.
+7. **Pasar a «En progreso»** (en *Ajustes*) cuando todo lo anterior esté listo.
+
+</Pasos>
+
+<Nota>
+El enlace de la demo no es un paso de arranque. Mientras el proyecto está en planificación, la tarjeta *Enlace del proyecto* aparece plegada. Agrégalo cuando haya algo que el cliente pueda abrir.
+</Nota>
+
+## Cómo se arma el trabajo
+
+<Jerarquia
+  titulo="De qué cuelga cada cosa"
+  descripcion="Ejemplo. El cliente ve el proyecto y sus hitos; los requerimientos y las tareas son internos."
+  bandas={[
+    { label: 'Lo ve el cliente', niveles: [0, 1] },
+    { label: 'Interno', niveles: [2, 3] },
+  ]}
+  raiz={{
+    id: 'proyecto', label: 'Proyecto', sub: 'alcance y cuotas', tono: 'brand',
+    hijos: [
+      {
+        id: 'h1', label: 'Hito 1 · Diseño', sub: 'entregables + cuota',
+        hijos: [
+          { id: 'r1', label: 'RF-01 · Login', hijos: [{ id: 't1', label: 'FOX-12', sub: 'tarea' }] },
+          { id: 'r2', label: 'RF-02 · Inventario', hijos: [{ id: 't2', label: 'FOX-13', sub: 'tarea' }] },
+        ],
+      },
+      { id: 'h2', label: 'Hito 2 · Entrega', sub: 'entregables + cuota', hijos: [{ id: 't3', label: 'FOX-20', sub: 'tarea directa' }] },
+    ],
+  }}
+/>
+
+- **Hito**: una entrega que el cliente revisa y aprueba. Tiene fecha, un checklist de entregables y, si corresponde, la cuota que se cobra al aprobarlo.
+- **Requerimiento**: una parte concreta de lo que se construye (RF-01, RF-02…). Se asigna a un hito en *Hitos y planificación → Requerimientos*.
+- **Tarea**: el trabajo diario. Puede colgar de un requerimiento, directo de un hito, o quedar **suelta** (sin hito).
+
+El hito de una tarea se decide en este orden:
+
+| Si la tarea… | Su hito es… |
+|---|---|
+| es una subtarea | el de su tarea principal |
+| cuelga de un requerimiento que tiene hito | el del requerimiento; en el detalle se lee «Lo toma del requerimiento RF-01» |
+| no tiene requerimiento | el que elijas a mano, o *Suelta (sin hito)* |
+
+Si cambias el hito de un requerimiento, sus tareas y subtareas se mueven con él.
+
+<Atencion>
+Una tarea suelta no hace avanzar ningún hito. Si el trabajo es parte de una entrega, cuélgalo de un requerimiento o del hito.
+</Atencion>
+
+## Cuándo avanza un hito
+
+Nadie cambia el estado de un hito a mano: se calcula con sus tareas (solo cuentan las que no tienen subtareas).
+
+<CicloDeEstados
+  titulo="Ciclo de un hito"
+  descripcion="Las flechas sin persona son automáticas. Aprobar o pedir cambios lo hace el cliente desde su portal, o un admin en su nombre."
+  estados={[
+    { id: 'pending', label: 'Pendiente', disparador: '' },
+    { id: 'progress', label: 'En curso', tono: 'info', disparador: 'alguna tarea\nempezada' },
+    { id: 'review', label: 'En revisión', tono: 'warn', disparador: 'todas las tareas\nterminadas' },
+    { id: 'approved', label: 'Aprobado', tono: 'ok', flecha: 'ok', disparador: 'el cliente\naprueba' },
+  ]}
+  retornos={[{ de: 'review', a: 'progress', label: 'piden cambios o se reabre una tarea' }]}
+/>
+
+- **Hito sin tareas** (por ejemplo, «Contrato firmado»): no avanza solo. Se manda con el botón *Enviar a revisión* en la tarjeta del hito.
+- **Aprobado no se deshace**: si después se reabre una tarea de un hito aprobado, el hito sigue aprobado.
+
+## Aprobación y cobro
+
+<Carriles
+  titulo="De la última tarea al cobro"
+  carriles={[
+    { id: 'equipo', label: 'Equipo' },
+    { id: 'sistema', label: 'Sistema' },
+    { id: 'cliente', label: 'Cliente' },
+  ]}
+  pasos={[
+    { id: 'termina', carril: 'equipo', label: 'Termina', sub: 'la última tarea' },
+    { id: 'revision', carril: 'sistema', label: 'En revisión', sub: 'automático', tono: 'warn' },
+    { id: 'revisa', carril: 'cliente', label: 'Revisa', sub: 'en su portal' },
+    { id: 'aprueba', carril: 'cliente', label: 'Aprueba', tono: 'ok', columna: 4 },
+    { id: 'cobro', carril: 'sistema', label: 'Por cobrar', sub: 'cuota del hito', tono: 'brand' },
+    { id: 'cambios', carril: 'equipo', label: 'Tarea nueva', sub: 'Cambios solicitados', columna: 4 },
+  ]}
+  flechas={[
+    { de: 'termina', a: 'revision' },
+    { de: 'revision', a: 'revisa' },
+    { de: 'revisa', a: 'aprueba', estilo: 'ok' },
+    { de: 'aprueba', a: 'cobro', estilo: 'ok' },
+    { de: 'revisa', a: 'cambios', label: 'pide cambios' },
+    { de: 'cambios', a: 'termina' },
+  ]}
+/>
+
+**Si el cliente aprueba**, en un solo paso:
+
+- el hito queda *Aprobado*, con quién y cuándo;
+- sus cuotas *Programadas* pasan a *Por cobrar*. Si no tenían fecha, vencen 7 días después de la aprobación.
+
+**Si el cliente pide cambios**, tiene que escribir qué quiere. El sistema crea una tarea «Cambios solicitados: …» en ese hito, y el hito vuelve a *En curso*. Cuando esa tarea se termina, el hito vuelve solo a revisión.
+
+Un admin puede aprobar o pedir cambios **en nombre del cliente** desde la tarjeta del hito, por ejemplo si el cliente aprobó por WhatsApp. Queda registrado quién lo hizo.
+
+<Nota>
+El cliente no puede reportar el pago de una cuota programada: esa cuota recién se habilita cuando aprueba el hito.
+</Nota>
+
+## Errores comunes
+
+- **Crear tareas sueltas para trabajo de una entrega.** El hito nunca llega a revisión. Cuélgalas de un requerimiento o del hito.
+- **Dejar hitos sin fecha.** No aparecen en el Calendario ni en Inicio, y el cliente no sabe cuándo esperar la entrega.
+- **Cargar la demo antes de tener algo.** El cliente la ve en su inicio apenas se guarda.
+- **Esperar que un hito sin tareas avance solo.** Hay que usar *Enviar a revisión*.
+
+## Preguntas frecuentes
+
+**¿El cliente ve las tareas?** No. Ve el proyecto, los hitos visibles con sus entregables y sus pagos. Los requerimientos y las tareas son internos.
+
+**¿Cómo se calcula el «Progreso global»?** Con las horas estimadas de las tareas terminadas sobre el total; una tarea sin estimar cuenta como 1 hora. Si el proyecto no tiene tareas, cuenta los hitos aprobados. Lo explica [Estimación y avance](/internal/guides/tareas#estimacion-y-avance).
+
+**¿Qué pasa si el hito ya está aprobado y aparece un bug?** Crea la tarea igual. El hito sigue aprobado; si el arreglo es grande, conviene un hito nuevo.
+
+**¿Y los sprints?** Son opcionales y solo para proyectos largos. Se activan en *Ajustes → Usar sprints en este proyecto*. El cliente nunca los ve.
