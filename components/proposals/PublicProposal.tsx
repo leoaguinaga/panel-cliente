@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { PublicProposalResponse, type ResponseAction } from './PublicProposalResponse';
 
 type Opened = {
   needsPin: false;
@@ -16,11 +16,6 @@ type State =
   | { kind: 'unavailable' }
   | { kind: 'ready'; data: Opened };
 
-/* Mientras no existan aceptar y agendar desde el panel, los botones de la propuesta dicen cómo seguir. */
-const ACTION_MESSAGES: Record<string, string> = {
-  accept: 'Gracias. Para aceptarla, responde al mensaje con el que te llegó este enlace y te enviamos el contrato.',
-  schedule: 'Responde al mensaje con el que te llegó este enlace y coordinamos la llamada.',
-};
 
 /** Abre el enlace (con PIN si hace falta) y traduce la respuesta a lo que se muestra. */
 async function openShare(token: string, pin?: string): Promise<State> {
@@ -52,6 +47,9 @@ export function PublicProposal({ token }: { token: string }) {
   const [pin, setPin] = useState('');
   const [sending, setSending] = useState(false);
   const frame = useRef<HTMLIFrameElement>(null);
+  const [action, setAction] = useState<ResponseAction | null>(null);
+  // Lo último que marcó el cliente en el cotizador de la propuesta.
+  const [addonIds, setAddonIds] = useState<string[]>([]);
 
   useEffect(() => {
     let alive = true;
@@ -69,7 +67,8 @@ export function PublicProposal({ token }: { token: string }) {
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       if (event.source !== frame.current?.contentWindow || event.data?.source !== 'foxcode-proposal') return;
-      if (event.data.type === 'fox:action') toast(ACTION_MESSAGES[event.data.action] ?? ACTION_MESSAGES.schedule);
+      if (event.data.type === 'fox:action') setAction(event.data.action === 'accept' ? 'accept' : 'schedule');
+      if (event.data.type === 'fox:addons' && Array.isArray(event.data.ids)) setAddonIds(event.data.ids.filter((id: unknown) => typeof id === 'string').slice(0, 30));
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
@@ -87,13 +86,24 @@ export function PublicProposal({ token }: { token: string }) {
 
   if (state.kind === 'ready')
     return (
-      <iframe
-        ref={frame}
-        title={`Propuesta para ${state.data.proposal.client}`}
-        src={`/api/backend/public/proposals/file/${state.data.file}`}
-        referrerPolicy="no-referrer"
-        className="fixed inset-0 h-dvh w-full border-0 bg-[#18181a]"
-      />
+      <>
+        <iframe
+          ref={frame}
+          title={`Propuesta para ${state.data.proposal.client}`}
+          src={`/api/backend/public/proposals/file/${state.data.file}`}
+          referrerPolicy="no-referrer"
+          className="fixed inset-0 h-dvh w-full border-0 bg-[#18181a]"
+        />
+        <PublicProposalResponse
+          action={action}
+          token={token}
+          pin={pin}
+          addonIds={addonIds}
+          client={state.data.proposal.client}
+          code={state.data.proposal.code}
+          onClose={() => setAction(null)}
+        />
+      </>
     );
 
   return (

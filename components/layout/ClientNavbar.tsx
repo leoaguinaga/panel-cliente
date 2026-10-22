@@ -7,14 +7,17 @@ import { useState } from 'react';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 
-const navItems = [
+const baseNavItems = [
   { name: 'Resumen', href: ROUTES.client.dashboard },
   { name: 'Mis proyectos', href: ROUTES.client.projects },
   { name: 'Calendario', href: ROUTES.client.calendar },
   { name: 'Pagos', href: ROUTES.client.payments },
 ];
+const proposalsItem = { name: 'Propuestas', href: '/client/proposals' };
 
-export function ClientNavbar() {
+/** «Propuestas» solo aparece si la empresa tiene alguna propuesta enviada. */
+export function ClientNavbar({ showProposals = false }: { showProposals?: boolean }) {
+  const navItems = showProposals ? [...baseNavItems, proposalsItem] : baseNavItems;
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);

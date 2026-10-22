@@ -95,6 +95,12 @@ export default async function LeadsPage({
             </Link>
           </div>
 
+          <Link
+            href="/internal/proposals"
+            className="rounded-lg border px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:text-slate-900"
+          >
+            Propuestas
+          </Link>
           <CreateLeadSheet workers={workers} products={products} defaultProductId={defaultProductId} />
         </div>
       </div>

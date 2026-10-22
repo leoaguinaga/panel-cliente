@@ -47,6 +47,8 @@ export type Proposal = {
   updatedAt: string;
   preparedBy: { id: string; name: string; email: string; jobTitle: string | null } | null;
   acceptedBy: { id: string; name: string } | null;
+  /** Quién aceptó desde el enlace /p/<token> */
+  acceptance?: { name: string; email: string; role: string | null; createdAt: string } | null;
   items: ProposalItem[];
   stages: ProposalStage[];
   addons: ProposalAddon[];
