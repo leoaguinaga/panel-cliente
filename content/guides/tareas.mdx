@@ -1,0 +1,133 @@
+{/* Fuentes: backend/src/modules/projects/task-rules.ts, status-change.ts, progress.ts, wip.ts, task-work.service.ts (review), components/kanban/TeamTaskBoard.tsx, components/kanban/TaskKanban.tsx, components/projects/TaskDrawer.tsx */}
+
+## Para qué sirve
+
+Las tareas son el trabajo diario del equipo. Cada una pertenece a un proyecto y se identifica con un código **FOX-&lt;número&gt;** que no se repite entre proyectos: úsalo para nombrarla en chats y commits.
+
+Hay dos tableros con las mismas reglas:
+
+- **[Tareas](/internal/tasks)**: todas las tareas de los proyectos, con pestañas *Mías*, *Equipo*, *Vencidas* y *Bloqueadas*.
+- **Kanban del proyecto**: solo las tareas de un proyecto, en su pestaña *Tareas*.
+
+## Estados y columnas
+
+El tablero tiene cuatro columnas. **Bloqueada** es un estado, pero no una columna: la tarjeta se queda en la columna donde estaba y se marca con un candado.
+
+<CicloDeEstados
+  titulo="Ciclo de una tarea"
+  descripcion="Sobre cada flecha va la regla que exige el servidor: si no se cumple, la tarjeta vuelve a su columna y aparece el motivo."
+  estados={[
+    { id: 'todo', label: 'Por hacer', disparador: '' },
+    { id: 'progress', label: 'En progreso', tono: 'info', disparador: 'sin prerequisitos\npendientes' },
+    { id: 'review', label: 'En revisión', tono: 'warn', disparador: 'con revisor\nasignado' },
+    { id: 'done', label: 'Terminada', tono: 'ok', flecha: 'ok', disparador: 'subtareas terminadas\ny evidencia si se pide' },
+  ]}
+  retornos={[{ de: 'review', a: 'progress', label: 'el revisor la devuelve con un comentario' }]}
+/>
+
+| Para pasar a… | Regla | Mensaje si falla |
+|---|---|---|
+| En progreso, En revisión o Terminada | Todos sus prerequisitos deben estar terminados | «La tarea tiene N prerequisito(s) pendiente(s)» |
+| En revisión | Debe tener revisor | «Asigna un revisor antes de enviar la tarea a revisión» |
+| Terminada | Todas sus subtareas deben estar terminadas | «La tarea tiene N subtarea(s) sin terminar» |
+| Terminada | Si pide evidencia, debe tener al menos una | «Esta tarea requiere evidencia…» |
+
+Volver a *Por hacer* o marcar *Bloqueada* siempre está permitido.
+
+## Lo que muestra cada tarjeta
+
+| Marca | Qué significa |
+|---|---|
+| `FOX-123` y proyecto | Código y proyecto de la tarea |
+| Urgente / Alta | Prioridad, solo si es alta o urgente |
+| Venció … (rojo) / Vence hoy (ámbar) | Fecha límite |
+| ⏱ 4 d | Días en la columna actual. Se cuenta en *En progreso* y *En revisión*; desde **3 días** se pinta en ámbar como tarea estancada. |
+| 🔒 Bloqueada · hace 2 d | Está bloqueada y desde cuándo |
+| 🔒 Espera | Tiene prerequisitos sin terminar |
+| 2/5 | Subtareas terminadas de las totales |
+| Revisa Ana | Quién la revisa, mientras está en revisión |
+
+La columna *Terminada* del tablero de Tareas muestra solo lo terminado en los últimos 7 días.
+
+## Límite de trabajo en curso
+
+Cada persona tiene un límite de tareas *En progreso* (por defecto **2**; un admin lo cambia en [Configuración → Operación](/internal/settings?section=operacion)). En la pestaña *Mías* la columna muestra «1 / 2» y, si lo pasas, se pinta en rojo con «Pasaste tu límite: termina una antes de tomar otra».
+
+<Nota>
+El límite es un aviso, no un bloqueo: el sistema te deja mover la tarea. La idea es terminar antes de empezar otra cosa.
+</Nota>
+
+En la pestaña *Equipo* el tablero se agrupa por persona, con «N en curso · límite 2» en cada fila. Así se ve rápido quién está sobrecargado y qué tareas están sin asignar.
+
+## Revisión
+
+Una tarea en revisión espera a su **revisor**. En el detalle aparece «Esperando revisión de …» y, para el revisor (o un admin), dos botones:
+
+<Pasos>
+
+1. **Aprobar**: la tarea pasa a *Terminada*. Se aplican las mismas reglas: subtareas y evidencia.
+2. **Devolver con comentario**: hay que escribir qué falta corregir. La tarea vuelve a *En progreso* y el comentario queda en la conversación como «Devuelta para corregir: …».
+
+</Pasos>
+
+<Atencion>
+Solo el revisor asignado o un admin pueden resolver una revisión. El revisor tiene que ser un admin o worker activo.
+</Atencion>
+
+## Subtareas y prerequisitos
+
+<Jerarquia
+  titulo="Cómo se arma una tarea"
+  descripcion="Ejemplo. Las subtareas tienen un solo nivel. Un prerequisito puede ser cualquier tarea del mismo proyecto."
+  raiz={{
+    id: 'tarea', label: 'FOX-41 · Página de contacto', sub: '8 h · revisa Ana', tono: 'brand',
+    hijos: [
+      { id: 's1', label: 'FOX-42 · Formulario', sub: '3 h' },
+      { id: 's2', label: 'FOX-43 · Envío de correo', sub: '4 h' },
+      { id: 's3', label: 'FOX-44 · Mapa', sub: 'sin estimar = 1 h' },
+    ],
+  }}
+/>
+
+**Subtareas.** Se agregan desde el detalle de la tarea. Reglas:
+
+- Una subtarea no puede tener subtareas.
+- Una tarea que ya tiene subtareas no puede volverse subtarea de otra.
+- La tarea principal no se puede terminar mientras tenga subtareas abiertas.
+- La subtarea toma el hito de su tarea principal.
+
+**Prerequisitos.** En *Prerequisitos* eliges una tarea previa del mismo proyecto. Mientras esa tarea no esté terminada, la tarjeta muestra *Espera* y no puede avanzar de *Por hacer*. El detalle de la tarea previa muestra *Desbloquea: FOX-…*. El sistema no deja crear ciclos (A espera a B y B espera a A).
+
+## Estimación y avance
+
+El avance del proyecto se calcula con las **horas estimadas**:
+
+- avance = horas de tareas terminadas ÷ horas de todas las tareas;
+- solo cuentan las tareas sin subtareas (una tarea con subtareas avanza por ellas);
+- una tarea sin estimación cuenta como **1 hora**.
+
+Se recalcula cada vez que una tarea cambia de estado. Estimar bien hace que el porcentaje del proyecto signifique algo.
+
+## Evidencias y conversación
+
+**Evidencias.** Prueban que la tarea está hecha: un **enlace** (debe empezar con http:// o https://), una **imagen** (captura) o una **nota**. Si marcas *Requiere evidencia para terminar*, la tarea no pasa a *Terminada* sin al menos una.
+
+**Conversación.** Los comentarios quedan en el detalle de la tarea (Ctrl/⌘ + Enter para enviar). Cada uno puede borrar sus comentarios; un admin puede borrar cualquiera. La pestaña de actividad registra los cambios de estado y de campos.
+
+## Errores comunes
+
+| Lo que pasa | Por qué | Qué hacer |
+|---|---|---|
+| La tarjeta vuelve sola a su columna | El servidor rechazó el cambio por una de las reglas | Lee el mensaje y cumple la regla (revisor, subtareas, prerequisitos, evidencia) |
+| No aparece el botón *Aprobar* | No eres el revisor ni admin | Pide al revisor que la resuelva |
+| «Este proyecto no usa sprints» | Se intentó asignar un sprint a un proyecto sin sprints | Actívalos en la configuración del proyecto o deja el sprint vacío |
+| El avance del proyecto no se mueve | Las tareas terminadas pesan poco frente al resto | Revisa las estimaciones |
+| La tarea bloqueada no aparece en *Bloqueada* | No es una columna | Usa la pestaña *Bloqueadas* de [Tareas](/internal/tasks) |
+
+## Preguntas frecuentes
+
+**¿Cuándo uso «Bloqueada» y cuándo un prerequisito?** Un prerequisito es otra tarea del proyecto que debe terminar antes. *Bloqueada* es para cualquier otra traba: falta un acceso, una respuesta del cliente, una decisión. En Inicio, los admin ven las tareas bloqueadas en *Requiere tu decisión*.
+
+**¿Al salir de «Bloqueada» se pierde de qué columna venía?** No. Al bloquearla se guarda su estado previo para dibujarla en esa columna. Al moverla se borra el bloqueo y empieza a contar de nuevo «días en la columna».
+
+**¿Quién puede eliminar una tarea?** Cualquier admin o worker, desde el detalle con *Eliminar tarea*. Si tiene subtareas, se eliminan con ella y no se puede deshacer.

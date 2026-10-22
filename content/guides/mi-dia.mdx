@@ -1,0 +1,132 @@
+{/* Fuentes: backend/src/modules/dashboard/dashboard.service.ts (getToday), backend/src/modules/calendar/calendar.service.ts, calendar-google.service.ts, app/(internal)/internal/dashboard/page.tsx, components/internal/today/*, src/modules/calendar/CalendarWorkspace.tsx */}
+
+## Para qué sirve
+
+Dos pantallas responden a «¿qué tengo que hacer?»:
+
+- **[Inicio](/internal/dashboard)**: lo de hoy, lo atrasado y los próximos 7 días. Es lo primero que ves al entrar.
+- **[Calendario](/internal/calendar)**: el mes completo, para mirar más adelante, filtrar por persona o proyecto y agendar reuniones o recordatorios.
+
+Ninguna de las dos tiene datos propios, salvo las reuniones y los recordatorios: muestran las fechas que ya pusiste en tareas, leads, demos, entregables, hitos y cobros. **Si algo no tiene fecha, no aparece.**
+
+Las fechas se cuentan en la hora de Lima. Inicio muestra solo el espacio activo (FoxCode o un producto); el Calendario muestra todos y se filtra con *Espacio*.
+
+## Qué aparece en cada lugar
+
+<Relaciones
+  titulo="De dónde sale cada pendiente"
+  descripcion="Cada línea une una pantalla con un módulo del que toma fechas. Las reuniones y los recordatorios son lo único que se crea en el Calendario."
+  nodos={[
+    { id: 'inicio', label: 'Inicio', sub: 'lo tuyo · hoy + 7 días', fila: 1, col: 0, tono: 'brand', href: '/internal/dashboard' },
+    { id: 'tareas', label: 'Tareas', sub: 'fecha límite', fila: 0, col: 1, href: '/internal/tasks' },
+    { id: 'leads', label: 'Leads y demos', sub: 'siguiente paso', fila: 1, col: 1, href: '/internal/leads' },
+    { id: 'proyectos', label: 'Proyectos', sub: 'entregables · hitos', fila: 2, col: 1, href: '/internal/projects' },
+    { id: 'cobros', label: 'Cobros', sub: 'solo admin', fila: 3, col: 1, href: '/internal/payments' },
+    { id: 'calendario', label: 'Calendario', sub: 'mes o agenda', fila: 1, col: 2, tono: 'brand', href: '/internal/calendar' },
+    { id: 'agenda', label: 'Reuniones', sub: 'y recordatorios', fila: 3, col: 2, punteado: true },
+  ]}
+  aristas={[
+    { de: 'inicio', a: 'tareas', flecha: false },
+    { de: 'inicio', a: 'leads', flecha: false },
+    { de: 'inicio', a: 'proyectos', flecha: false },
+    { de: 'inicio', a: 'cobros', flecha: false },
+    { de: 'calendario', a: 'tareas', flecha: false },
+    { de: 'calendario', a: 'leads', flecha: false },
+    { de: 'calendario', a: 'proyectos', flecha: false },
+    { de: 'calendario', a: 'cobros', flecha: false },
+    { de: 'calendario', a: 'agenda', label: 'se crean aquí', estilo: 'punteada', flecha: false },
+  ]}
+/>
+
+| Pendiente | Fecha que lo agenda | Inicio | Calendario |
+|---|---|---|---|
+| Tarea | Fecha límite, mientras no esté terminada | Solo las tuyas | Worker: las suyas · Admin: todas |
+| Seguimiento de lead | *Siguiente paso*, mientras no esté ganado ni perdido | Tuyos (admin: también sin responsable) | Worker: los suyos · Admin: todos |
+| Demo y seguimiento de demo | Fecha de la demo o de su siguiente paso | Tuyas (admin: también sin responsable) | Worker: las suyas · Admin: todas |
+| Entregable | Fecha de entrega, mientras no esté completado | De proyectos de los que eres responsable | De tus proyectos |
+| Hito | Inicio: esperando aprobación del cliente · Calendario: fecha del hito, si no está aprobado | De tus proyectos | De tus proyectos |
+| Comprobante de pago por revisar | Siempre hoy | Solo admin | — |
+| Cobro | Fecha de vencimiento | Solo admin | Solo admin |
+| Reunión o recordatorio | Fecha (y hora) del evento | — | Según su visibilidad |
+
+«Tus proyectos» son los que tienen tu nombre como responsable. En el Calendario, un worker también ve los proyectos donde tiene alguna tarea asignada.
+
+<Nota>
+Inicio y Calendario no siempre coinciden. Inicio muestra lo que te toca a ti. El Calendario de un admin muestra a todo el equipo, y se filtra con *Responsable*.
+</Nota>
+
+## Inicio
+
+De arriba abajo:
+
+<Pasos>
+
+1. **Saludo y resumen**: cuántos pendientes tienes hoy, cuántos están atrasados y, si eres admin, cuántos casos esperan tu decisión.
+2. **Atrasado**: lo que tenía fecha anterior a hoy y sigue abierto.
+3. **Hoy**: lo que vence hoy. Cada fila tiene su botón: *Abrir tarea*, *Ver lead*, *Revisar comprobante*, etc.
+4. **Requiere tu decisión** (solo admin): cobros vencidos, proyectos sin responsable, tareas bloqueadas y tareas abiertas sin asignar (*Repartir tareas*).
+5. **Próximos 7 días**: hoy y los seis días siguientes, con un punto de color por tipo. Hoy remite a la lista de arriba.
+6. **Pie**: proyectos activos y pausados, tareas abiertas del equipo y el enlace a *Resumen de gestión*.
+
+</Pasos>
+
+Si no tienes nada para hoy, aparece «Nada pendiente para hoy» con lo próximo que viene.
+
+Los admin tienen además el menú **Nuevo** para crear un prospecto o un proyecto sin salir de Inicio.
+
+## Calendario
+
+Tiene dos vistas, **Mes** y **Agenda**, y filtros por tipo de pendiente, responsable, proyecto y espacio. Al elegir un día se abre su lista a un lado; cada pendiente enlaza a su pantalla.
+
+**Vencidos** reúne todo lo que tenía fecha antes de hoy y sigue abierto, sin importar el mes que estés mirando.
+
+<Atencion>
+Al filtrar por proyecto o por espacio desaparecen los seguimientos de leads: un lead todavía no pertenece a ningún proyecto.
+</Atencion>
+
+## Reuniones y recordatorios
+
+Son lo único que se crea en el Calendario. Todo lo demás se agenda desde su módulo.
+
+| | Recordatorio | Reunión |
+|---|---|---|
+| Hora | Opcional | Obligatoria |
+| Visibilidad por defecto | Personal | Compartida con el equipo |
+| Google Meet e invitaciones | No | Sí, si Google está conectado |
+| Cómo se cierra | Se marca como completado | Se cancela (una reunión cancelada no se reabre) |
+
+**Visibilidad.** *Personal* lo ven solo quien lo creó y su responsable, y el responsable tiene que ser quien lo crea. Para asignarlo a otra persona elige *Compartido con el equipo*, que lo ven todos los internos.
+
+**Quién edita.** Quien lo creó, su responsable y, si es compartido, cualquier admin.
+
+## Google Calendar
+
+FoxCode tiene **una sola cuenta organizadora** de Google. Un admin la conecta en [Configuración → Integraciones](/internal/settings?section=integraciones).
+
+Con la cuenta conectada, una reunión puede **generar un enlace de Google Meet** y **enviar invitaciones** a los correos que agregues. El detalle de la reunión muestra el estado: *Sincronizado con Google Calendar*, *Sincronizando* o pendiente.
+
+<Pasos>
+
+1. Si Google no está conectado, la reunión igual se guarda; solo no tendrá Meet ni invitaciones.
+2. Si la sincronización falla, la reunión queda guardada y el aviso dice que falta sincronizar. Abre su detalle para reintentar.
+3. Las opciones de Meet e invitaciones no se pueden cambiar después de que la reunión se sincronizó.
+
+</Pasos>
+
+## Errores comunes
+
+| Lo que pasa | Por qué | Qué hacer |
+|---|---|---|
+| Una tarea no aparece en Inicio | No tiene fecha límite, no es tuya o vence en más de 7 días | Ponle fecha y responsable |
+| Un lead no aparece | No tiene *Siguiente paso* o ya está ganado o perdido | Ponle fecha en su hoja |
+| No veo un entregable de mi proyecto | No eres el responsable del proyecto | Pide que te asignen como responsable |
+| «Para asignar a otra persona selecciona Equipo» | Un evento personal solo puede ser tuyo | Cambia la visibilidad a *Compartido* |
+| «Selecciona un rango válido de hasta 62 días» | El Calendario carga como máximo 62 días | Acorta el rango |
+
+## Preguntas frecuentes
+
+**¿Por qué un comprobante aparece siempre «hoy»?** Porque espera una acción ya: revisarlo y validar o rechazar el pago.
+
+**¿Puedo marcar una tarea como hecha desde Inicio?** Todavía no. El botón abre la tarea y ahí cambias su estado.
+
+**¿Cambiar de espacio cambia lo que veo?** En Inicio, sí: muestra solo lo del espacio activo. El Calendario tiene su propio filtro *Espacio*.

@@ -79,7 +79,8 @@ export default async function LeadDetailPage({
             </form>
           )}
 
-          {lead.status !== 'WON' && (
+          {/* Convertido = tiene cliente; un lead movido a Ganado sin convertir todavía se convierte aquí. */}
+          {!lead.clientId && (
             <form action={handleConvert} className="flex flex-wrap items-center gap-2">
               <label className="sr-only" htmlFor="convert-project-type">Tipo de proyecto</label>
               <select id="convert-project-type" name="projectType" defaultValue={defaultProjectTypeForLead(lead.type)} className="h-8 rounded-md border bg-card px-2 text-xs">
@@ -233,7 +234,7 @@ export default async function LeadDetailPage({
           </div>
         </div>
       </div>
-      {lead.status !== 'WON' && <section className="space-y-3 rounded-xl border p-5"><h2 className="font-medium">Convertir solo a cliente o con proyecto personalizado</h2><ActionForm action={convertLeadToClientAction.bind(null,lead.id)} className="space-y-3"><label className="block text-sm">Proyecto opcional<input name="projectName" className="mt-1 w-full rounded-md border p-2" /></label><button className="rounded-md border px-4 py-2 text-sm">Convertir lead</button></ActionForm></section>}
+      {!lead.clientId && <section className="space-y-3 rounded-xl border p-5"><h2 className="font-medium">Convertir solo a cliente o con proyecto personalizado</h2><ActionForm action={convertLeadToClientAction.bind(null,lead.id)} className="space-y-3"><label className="block text-sm">Proyecto opcional<input name="projectName" className="mt-1 w-full rounded-md border p-2" /></label><button className="rounded-md border px-4 py-2 text-sm">Convertir lead</button></ActionForm></section>}
     </div>
   );
 }

@@ -1,0 +1,161 @@
+{/* Fuentes: components/kanban/LeadSheet.tsx, components/kanban/LeadKanban.tsx, backend/src/modules/leads/leads.service.ts, backend/src/modules/dashboard/dashboard.service.ts (getToday) */}
+
+## Para qué sirve
+
+Leads es el embudo comercial: cada tarjeta es un negocio que todavía no es cliente. El objetivo de la pantalla es que **ningún lead se quede sin siguiente paso**. Cada lead tiene una etapa, un responsable y una fecha para el próximo contacto; esa fecha es la que lo hace aparecer en tu [Inicio](/internal/dashboard) y en el [Calendario](/internal/calendar).
+
+El tablero muestra los leads del espacio activo (FoxCode o un producto). Un lead nuevo nace en el espacio que tengas elegido arriba a la izquierda.
+
+## Etapas del embudo
+
+Hay dos caminos, según de dónde salió el lead. Los dos terminan en **En negociación → Ganado**.
+
+<CicloDeEstados
+  titulo="Prospección propia"
+  descripcion="Leads que buscamos nosotros: mapeamos negocios por zona y les preparamos una maqueta antes de escribirles."
+  estados={[
+    { id: 'mapped', label: 'Mapeo en zona', disparador: '' },
+    { id: 'site', label: 'Desarrollo', sub: 'maqueta', tono: 'info', disparador: 'empieza la maqueta' },
+    { id: 'presented', label: 'Contactado / Demo', tono: 'warn', disparador: 'se envía la maqueta\n(registra el contacto)' },
+    { id: 'feedback', label: 'En negociación', tono: 'warn', disparador: 'pide cambios o precio\n(registra el contacto)' },
+    { id: 'won', label: 'Ganado', tono: 'ok', flecha: 'ok', disparador: 'acepta → cliente\ny proyecto' },
+  ]}
+  retornos={[{ de: 'feedback', a: 'presented', label: 'nueva versión de la maqueta' }]}
+/>
+
+<CicloDeEstados
+  titulo="Entrada (landing, referidos)"
+  descripcion="Leads que nos escriben. Estas columnas solo aparecen en el tablero cuando hay algún lead en ellas."
+  estados={[
+    { id: 'new', label: 'Nuevo', disparador: '' },
+    { id: 'contacted', label: 'Contactado', tono: 'info', disparador: 'primer contacto' },
+    { id: 'meeting', label: 'Reunión', sub: 'agendada', tono: 'info', disparador: 'fecha de\nreunión' },
+    { id: 'presented', label: 'Contactado', sub: 'demo', tono: 'warn', disparador: 've la demo' },
+    { id: 'quoted', label: 'Cotizado', tono: 'warn', disparador: 'propuesta\nenviada' },
+    { id: 'feedback', label: 'Negociación', tono: 'warn', disparador: 'discute\nprecio' },
+    { id: 'won', label: 'Ganado', tono: 'ok', flecha: 'ok', disparador: 'acepta' },
+  ]}
+/>
+
+| Etapa | Qué significa | Qué hace el sistema |
+|---|---|---|
+| Mapeo en zona | Negocio identificado, todavía sin trabajo | — |
+| Desarrollo autónomo | Estamos armando su maqueta | — |
+| Nuevo | Nos escribió (landing, referido) | — |
+| Contactado | Ya hablamos con él | — |
+| Reunión agendada | Hay una reunión por delante | — |
+| Contactado / Demo | Vio la maqueta o la demo | Marca **último contacto = hoy** |
+| Cotizado | Tiene una propuesta con precio | — |
+| En negociación | Discute cambios o precio | Marca **último contacto = hoy** |
+| Ganado | Aceptó | Abre la conversión a cliente y proyecto |
+| Rechazado | Se perdió | Guarda el motivo |
+
+En la hoja del lead, la barra de **Etapa** muestra solo el camino que le corresponde («3 de 5») y el botón **Avanzar a …** lo lleva a la siguiente. También puedes arrastrar la tarjeta entre columnas: el cambio se ve al instante y, si el servidor lo rechaza, la tarjeta vuelve a su lugar.
+
+## Siguiente paso
+
+Es lo más importante de la hoja. Tiene tres partes:
+
+- **Fecha**: cuándo toca volver a contactarlo. Hay atajos (*Hoy*, *Mañana*, *+1 semana*) y un selector de fecha. *Quitar* la deja sin fecha.
+- **Qué hay que hacer**: una frase corta, por ejemplo «enviar la maqueta». Se guarda al salir del campo o con Enter.
+- **Último contacto**: cuántos días pasaron desde que alguien habló con el lead. Se pone en ámbar a partir de 7 días o si nunca se registró. El botón **Registré un contacto** lo deja en hoy.
+
+Cuando la fecha pasa, la hoja cambia a **Vencido hace N días** con dos salidas:
+
+<Pasos>
+
+1. **Hecho**: borra la fecha y la nota, y registra el contacto de hoy. Después pon el siguiente paso.
+2. **Reprogramar**: vuelve al editor para elegir otra fecha.
+
+</Pasos>
+
+En el tablero, la tarjeta muestra **Vencido** (rojo) o **Hoy** (ámbar). Los leads ganados o perdidos no se marcan.
+
+<Nota>
+Los leads con fecha de siguiente paso entran en Inicio y en el Calendario como «Seguimiento». En Inicio, un worker ve los suyos y un admin ve los suyos y los que no tienen responsable. Detalles en [Mi día](/internal/guides/mi-dia#que-aparece-en-cada-lugar).
+</Nota>
+
+## La hoja del lead
+
+Al hacer clic en una tarjeta se abre una hoja lateral con todo lo necesario para trabajar el lead sin salir del tablero:
+
+| Bloque | Para qué |
+|---|---|
+| Encabezado | Zona, espacio, prioridad y responsable. Cada uno se cambia con un clic. |
+| Etapa | Barra del camino y botón *Avanzar a …* |
+| Siguiente paso | Fecha, qué hacer y último contacto (ver arriba) |
+| Propuestas | Las propuestas comerciales del lead. *Nueva propuesta* abre el editor y sale en PDF; *Subir interactiva* recibe el `propuesta.html` hecho en Claude Code (foxcode/propuestas) y toma montos y opcionales de su manifiesto. |
+| Contactar | WhatsApp con un mensaje ya escrito (incluye el enlace de la maqueta si existe), llamada y correo. Un celular de 9 dígitos que empieza en 9 se completa con +51. |
+| Demo | La demo creada en el producto o, si no hay, el enlace a la maqueta |
+| Notas | Texto libre; se guarda al salir del campo |
+| Datos | Nombre, contacto, teléfono, correo, enlace de la maqueta |
+
+Abajo, **Ver ficha completa** abre la página del lead con su historial. El indicador del pie muestra si el último cambio se guardó o falló.
+
+## Ganar un lead
+
+Al pasar un lead a **Ganado** se abre el diálogo **Crear cliente y proyecto**. Eliges el tipo de proyecto (se sugiere según el tipo de lead), el nombre, el precio y el responsable.
+
+<Carriles
+  titulo="Del primer contacto al proyecto"
+  carriles={[
+    { id: 'comercial', label: 'Comercial' },
+    { id: 'lead', label: 'Lead' },
+    { id: 'sistema', label: 'Sistema' },
+  ]}
+  pasos={[
+    { id: 'mapear', carril: 'comercial', label: 'Registra', sub: 'el lead', href: '/internal/leads' },
+    { id: 'contacto', carril: 'comercial', label: 'Contacta', sub: 'y fija fecha' },
+    { id: 'demo', carril: 'lead', label: 'Ve la demo', sub: 'o la maqueta' },
+    { id: 'propuesta', carril: 'comercial', label: 'Propuesta', sub: 'y negociación' },
+    { id: 'acepta', carril: 'lead', label: 'Acepta', tono: 'ok' },
+    { id: 'convierte', carril: 'comercial', label: 'Ganado', sub: 'crear proyecto', tono: 'brand' },
+    { id: 'crea', carril: 'sistema', label: 'Cliente', sub: '+ proyecto', tono: 'brand' },
+  ]}
+  flechas={[
+    { de: 'mapear', a: 'contacto' },
+    { de: 'contacto', a: 'demo' },
+    { de: 'demo', a: 'propuesta' },
+    { de: 'propuesta', a: 'acepta' },
+    { de: 'acepta', a: 'convierte', estilo: 'ok' },
+    { de: 'convierte', a: 'crea', estilo: 'ok' },
+    { de: 'propuesta', a: 'contacto', label: 'no responde' },
+  ]}
+/>
+
+Al confirmar, el sistema hace todo en un solo paso:
+
+- **Cliente**: si ya existe un cliente con el mismo correo, lo reutiliza; si no, lo crea. Si hay dos clientes con ese correo, se detiene y pide resolver el duplicado primero.
+- **Proyecto**: en estado *Planificación*, en el mismo espacio que el lead y con el responsable elegido (o el del lead).
+- **Sprint 1 - Kickoff**, ya activo.
+- Si es un sitio web o landing, además el requerimiento **REQ-01** y la tarea *Configurar dominio y despliegue inicial en staging*.
+
+Luego te lleva al proyecto. Un lead se convierte una sola vez: queda enlazado a su cliente y su proyecto.
+
+<Atencion>
+Si cierras el diálogo sin confirmar, el lead queda en Ganado sin cliente. La hoja lo avisa con «Falta convertirlo en cliente y proyecto» y el botón **Crear cliente y proyecto**.
+</Atencion>
+
+## Perder y reabrir
+
+**Marcar como perdido** está al pie de la hoja. Pide un motivo (*Precio*, *Sin respuesta*, *Eligió a otro*, *No era el momento* u *Otro*) y un detalle opcional. El motivo queda guardado y se ve en la hoja.
+
+Un lead perdido se puede **reabrir**: vuelve a la primera etapa de su camino y el motivo se borra.
+
+## Errores comunes
+
+| Lo que pasa | Por qué | Qué hacer |
+|---|---|---|
+| El lead no aparece en mi Inicio | No tiene fecha de siguiente paso, o es de otro responsable | Ponle fecha en *Siguiente paso* |
+| No veo la columna «Cotizado» | Las columnas de entrada solo se muestran si hay leads en ellas | Mueve el lead desde su hoja con la barra de Etapa |
+| «Resuelve los clientes duplicados antes de convertir» | Hay dos clientes con el correo del lead | Corrige el correo de uno en [Clientes](/internal/clients) |
+| No aparece el botón de WhatsApp | El lead no tiene teléfono | Agrégalo en *Datos* |
+| El lead está en otro espacio | Cada lead pertenece a un espacio | Cámbialo desde el chip de espacio del encabezado |
+
+## Preguntas frecuentes
+
+**¿Qué cuenta como «último contacto»?** La fecha que marca *Registré un contacto* o *Hecho*. Pasar a *Contactado / Demo* o *En negociación* también la actualiza.
+
+**¿Puedo tener un lead sin responsable?** Sí, pero en Inicio solo lo ven los admin. Asígnalo para que alguien lo trabaje.
+
+**¿Qué pasa con la fecha de siguiente paso al ganar o perder?** Deja de mostrarse: los leads ganados o perdidos no aparecen en Inicio ni en el Calendario.

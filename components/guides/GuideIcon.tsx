@@ -1,4 +1,4 @@
-import { CalendarDays, Flame, FlaskConical, FolderKanban, ListChecks, type LucideProps } from 'lucide-react';
+import { CalendarDays, Flame, FolderKanban, ListChecks, type LucideProps } from 'lucide-react';
 import type { GuideIcon as GuideIconName } from '@/src/modules/guides/registry';
 
 const ICONS = {
@@ -6,7 +6,6 @@ const ICONS = {
   tasks: ListChecks,
   today: CalendarDays,
   project: FolderKanban,
-  test: FlaskConical,
 } satisfies Record<GuideIconName, React.ComponentType<LucideProps>>;
 
 export function GuideIcon({ name, ...props }: { name: GuideIconName } & LucideProps) {

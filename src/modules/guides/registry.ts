@@ -6,7 +6,7 @@
  * `updatedAt` en el mismo commit.
  */
 
-export type GuideIcon = 'leads' | 'tasks' | 'today' | 'project' | 'test';
+export type GuideIcon = 'leads' | 'tasks' | 'today' | 'project';
 
 export type GuideSection = {
   /** Debe coincidir con el id que genera `headingId()` a partir del `##` del MDX. */
@@ -36,27 +36,71 @@ export type Guide = {
 };
 
 export const GUIDES: Guide[] = [
-  // Guía de prueba de las Fases 1 y 2: valida el MDX y el kit de diagramas. Se borra en la Fase 4.
   {
-    slug: 'prueba',
-    title: 'Guía de prueba',
-    summary: 'Valida el módulo: texto, tablas, avisos y los cuatro tipos de diagrama.',
-    icon: 'test',
-    updatedAt: '2026-10-20',
-    // Rutas de prueba para el «?» de la Fase 3; las guías reales las reemplazan en la Fase 4.
+    slug: 'leads',
+    title: 'Leads',
+    summary: 'Etapas del embudo, el siguiente paso de cada lead y qué pasa al ganarlo o perderlo.',
+    icon: 'leads',
+    updatedAt: '2026-10-21',
     covers: [
-      { route: '/internal/tasks', section: 'avisos-y-pasos' },
-      { route: '/internal/leads', section: 'carriles' },
-      { route: '/internal/leads/[leadId]', section: 'ciclo-de-estados' },
-      { route: '/internal/projects/[projectId]/tasks/kanban', section: 'jerarquia' },
+      { route: '/internal/leads' },
+      { route: '/internal/leads/new', section: 'etapas-del-embudo' },
+      { route: '/internal/leads/[leadId]', section: 'siguiente-paso' },
     ],
     sections: [
       { id: 'para-que-sirve', title: 'Para qué sirve' },
-      { id: 'relaciones', title: 'Relaciones' },
-      { id: 'jerarquia', title: 'Jerarquía' },
-      { id: 'ciclo-de-estados', title: 'Ciclo de estados' },
-      { id: 'carriles', title: 'Carriles' },
-      { id: 'avisos-y-pasos', title: 'Avisos y pasos', keywords: ['revisor', 'subtareas'] },
+      { id: 'etapas-del-embudo', title: 'Etapas del embudo', keywords: ['embudo', 'mapeo', 'maqueta', 'cotizado', 'negociación'] },
+      { id: 'siguiente-paso', title: 'Siguiente paso', keywords: ['seguimiento', 'vencido', 'último contacto', 'reprogramar'] },
+      { id: 'la-hoja-del-lead', title: 'La hoja del lead', keywords: ['whatsapp', 'demo', 'notas'] },
+      { id: 'ganar-un-lead', title: 'Ganar un lead', keywords: ['ganado', 'convertir', 'cliente', 'kickoff'] },
+      { id: 'perder-y-reabrir', title: 'Perder y reabrir', keywords: ['perdido', 'motivo', 'rechazado'] },
+      { id: 'errores-comunes', title: 'Errores comunes' },
+      { id: 'preguntas-frecuentes', title: 'Preguntas frecuentes' },
+    ],
+  },
+  {
+    slug: 'tareas',
+    title: 'Tareas y Kanban',
+    summary: 'Estados y reglas del tablero, revisión, subtareas, prerequisitos, evidencias y cómo se calcula el avance.',
+    icon: 'tasks',
+    updatedAt: '2026-10-21',
+    covers: [
+      { route: '/internal/tasks', section: 'estados-y-columnas' },
+      { route: '/internal/projects/[projectId]/tasks/kanban', section: 'estados-y-columnas' },
+      { route: '/internal/projects/[projectId]/tasks/gantt', section: 'subtareas-y-prerequisitos' },
+    ],
+    sections: [
+      { id: 'para-que-sirve', title: 'Para qué sirve', keywords: ['FOX'] },
+      { id: 'estados-y-columnas', title: 'Estados y columnas', keywords: ['bloqueada', 'por hacer', 'terminada'] },
+      { id: 'lo-que-muestra-cada-tarjeta', title: 'Lo que muestra cada tarjeta', keywords: ['días en la columna', 'estancada', 'espera'] },
+      { id: 'limite-de-trabajo-en-curso', title: 'Límite de trabajo en curso', keywords: ['wip', 'límite', 'en curso'] },
+      { id: 'revision', title: 'Revisión', keywords: ['revisor', 'aprobar', 'devolver'] },
+      { id: 'subtareas-y-prerequisitos', title: 'Subtareas y prerequisitos', keywords: ['subtareas', 'dependencias', 'desbloquea'] },
+      { id: 'estimacion-y-avance', title: 'Estimación y avance', keywords: ['horas', 'progreso', 'porcentaje'] },
+      { id: 'evidencias-y-conversacion', title: 'Evidencias y conversación', keywords: ['evidencia', 'captura', 'comentarios'] },
+      { id: 'errores-comunes', title: 'Errores comunes' },
+      { id: 'preguntas-frecuentes', title: 'Preguntas frecuentes' },
+    ],
+  },
+  {
+    slug: 'mi-dia',
+    title: 'Mi día',
+    summary: 'Qué aparece en Inicio y en el Calendario, de dónde sale cada pendiente y cómo agendar reuniones con Google.',
+    icon: 'today',
+    updatedAt: '2026-10-21',
+    covers: [
+      { route: '/internal/dashboard', section: 'inicio' },
+      { route: '/internal/calendar', section: 'calendario' },
+    ],
+    sections: [
+      { id: 'para-que-sirve', title: 'Para qué sirve' },
+      { id: 'que-aparece-en-cada-lugar', title: 'Qué aparece en cada lugar', keywords: ['agenda', 'pendientes', 'fecha'] },
+      { id: 'inicio', title: 'Inicio', keywords: ['hoy', 'atrasado', 'próximos 7 días', 'decisión'] },
+      { id: 'calendario', title: 'Calendario', keywords: ['mes', 'vencidos'] },
+      { id: 'reuniones-y-recordatorios', title: 'Reuniones y recordatorios', keywords: ['reunión', 'recordatorio', 'visibilidad'] },
+      { id: 'google-calendar', title: 'Google Calendar', keywords: ['meet', 'invitaciones', 'google'] },
+      { id: 'errores-comunes', title: 'Errores comunes' },
+      { id: 'preguntas-frecuentes', title: 'Preguntas frecuentes' },
     ],
   },
 ];
