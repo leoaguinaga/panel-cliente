@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ChevronDown, Download, FileText, Plus } from 'lucide-react';
+import { ChevronDown, Download, FileCode2, FileText, Plus, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { PROPOSAL_STATUS, formatMoney, layerShort, proposalLabel, shortDate } from '@/src/modules/proposals/format';
 import type { Proposal } from '@/src/modules/proposals/types';
+import { htmlUrl, uploadProposalHtml } from '@/src/modules/proposals/upload';
 
 async function call<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { ...init, headers: { 'Content-Type': 'application/json' } });
@@ -22,6 +23,8 @@ export function LeadProposals({ leadId, disabled }: { leadId: string; disabled?:
   const [proposals, setProposals] = useState<Proposal[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let alive = true;
@@ -45,6 +48,22 @@ export function LeadProposals({ leadId, disabled }: { leadId: string; disabled?:
     }
   };
 
+  /** Interactiva: el propuesta.html que generó Claude Code; el panel lee montos y opcionales de su manifiesto. */
+  const upload = async (file: File | undefined) => {
+    if (!file) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const proposal = await uploadProposalHtml(`/api/backend/leads/${leadId}/proposals/interactive`, file);
+      router.push(`/internal/proposals/${proposal.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo subir la propuesta');
+      setUploading(false);
+    } finally {
+      if (fileInput.current) fileInput.current.value = '';
+    }
+  };
+
   // Llegan ordenadas por código y versión descendente: la primera de cada código es la vigente.
   const groups = new Map<string, Proposal[]>();
   for (const proposal of proposals ?? []) groups.set(proposal.code, [...(groups.get(proposal.code) ?? []), proposal]);
@@ -56,18 +75,25 @@ export function LeadProposals({ leadId, disabled }: { leadId: string; disabled?:
         <ProposalCard key={latest.id} proposal={latest} older={older} />
       ))}
       {proposals?.length === 0 && (
-        <p className="rounded-xl border border-dashed p-3 text-sm text-muted-foreground">Arma la propuesta aquí: hereda el negocio del lead y se imprime con el diseño de FoxCode.</p>
+        <p className="rounded-xl border border-dashed p-3 text-sm text-muted-foreground">Arma la propuesta aquí y sale en PDF, o sube una interactiva hecha en Claude Code (foxcode/propuestas).</p>
       )}
       {error && (
-        <p role="alert" className="text-xs text-rose-400">
+        <p role="alert" className="whitespace-pre-line text-xs text-rose-400">
           {error}
         </p>
       )}
       {!disabled && (
-        <Button type="button" variant="outline" size="xs" className="gap-1" onClick={create} disabled={creating || proposals === null}>
-          <Plus aria-hidden="true" />
-          {creating ? 'Creando…' : 'Nueva propuesta'}
-        </Button>
+        <div className="flex flex-wrap gap-1.5">
+          <Button type="button" variant="outline" size="xs" className="gap-1" onClick={create} disabled={creating || uploading || proposals === null}>
+            <Plus aria-hidden="true" />
+            {creating ? 'Creando…' : 'Nueva propuesta'}
+          </Button>
+          <Button type="button" variant="outline" size="xs" className="gap-1" onClick={() => fileInput.current?.click()} disabled={creating || uploading || proposals === null}>
+            <Upload aria-hidden="true" />
+            {uploading ? 'Subiendo…' : 'Subir interactiva'}
+          </Button>
+          <input ref={fileInput} type="file" accept=".html,text/html" className="sr-only" tabIndex={-1} aria-hidden="true" onChange={(event) => upload(event.target.files?.[0])} />
+        </div>
       )}
     </div>
   );
@@ -76,11 +102,15 @@ export function LeadProposals({ leadId, disabled }: { leadId: string; disabled?:
 function ProposalCard({ proposal, older }: { proposal: Proposal; older: Proposal[] }) {
   const status = PROPOSAL_STATUS[proposal.status];
   const layers = proposal.layers.map(layerShort).join(' + ');
+  const interactive = proposal.mode === 'INTERACTIVE';
   return (
     <div className="rounded-xl border bg-card p-3.5 text-sm">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[11.5px] font-semibold tabular-nums text-muted-foreground">{proposalLabel(proposal)}</p>
+          <p className="flex items-center gap-1.5 text-[11.5px] font-semibold tabular-nums text-muted-foreground">
+            {proposalLabel(proposal)}
+            {interactive && <span className="rounded-full border border-primary/40 bg-primary/10 px-1.5 text-[10.5px] text-primary">Interactiva</span>}
+          </p>
           <p className="truncate font-semibold">
             {proposal.title}
             {layers && <span className="font-normal text-muted-foreground"> · {layers}</span>}
@@ -112,13 +142,13 @@ function ProposalCard({ proposal, older }: { proposal: Proposal; older: Proposal
         <Button asChild variant="outline" size="xs" className="gap-1">
           <Link href={`/internal/proposals/${proposal.id}`}>
             <FileText aria-hidden="true" />
-            {proposal.status === 'DRAFT' ? 'Seguir editando' : 'Ver propuesta'}
+            {proposal.status === 'DRAFT' && !interactive ? 'Seguir editando' : 'Ver propuesta'}
           </Link>
         </Button>
         <Button asChild variant="ghost" size="xs" className="gap-1">
-          <a href={`/api/backend/proposals/${proposal.id}/pdf`} download>
-            <Download aria-hidden="true" />
-            PDF
+          <a href={interactive ? htmlUrl(proposal.id, true) : `/api/backend/proposals/${proposal.id}/pdf`} download>
+            {interactive ? <FileCode2 aria-hidden="true" /> : <Download aria-hidden="true" />}
+            {interactive ? 'HTML' : 'PDF'}
           </a>
         </Button>
       </div>

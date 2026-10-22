@@ -750,7 +750,7 @@ function Segmented({ label, value, options, onChange }: { label: string; value: 
   );
 }
 
-function RejectDialog({ busy, onConfirm }: { busy: boolean; onConfirm: (reason: string) => void }) {
+export function RejectDialog({ busy, onConfirm }: { busy: boolean; onConfirm: (reason: string) => void }) {
   const [reason, setReason] = useState('');
   return (
     <AlertDialog>
@@ -777,7 +777,7 @@ function RejectDialog({ busy, onConfirm }: { busy: boolean; onConfirm: (reason: 
   );
 }
 
-function SummaryRow({ label, children }: { label: string; children: ReactNode }) {
+export function SummaryRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex justify-between gap-3">
       <dt className="text-muted-foreground">{label}</dt>

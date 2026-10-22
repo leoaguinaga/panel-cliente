@@ -1,5 +1,6 @@
 export type ProposalStatus = 'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
 export type ProposalTaxMode = 'PLUS_IGV' | 'IGV_INCLUDED';
+export type ProposalMode = 'DOCUMENT' | 'INTERACTIVE';
 export type ProposalLayer = 'WEB' | 'BACKEND' | 'MOBILE';
 
 type Money = string | number;
@@ -37,6 +38,11 @@ export type Proposal = {
   rejectedAt: string | null;
   rejectionReason: string | null;
   pdfDocumentId: string | null;
+  /** INTERACTIVE: HTML hecho en Claude Code (foxcode/propuestas); sus datos salen del manifiesto. */
+  mode: ProposalMode;
+  htmlBytes: number | null;
+  htmlUploadedAt: string | null;
+  manifest: ProposalManifest | null;
   createdAt: string;
   updatedAt: string;
   preparedBy: { id: string; name: string; email: string; jobTitle: string | null } | null;
@@ -45,6 +51,16 @@ export type Proposal = {
   stages: ProposalStage[];
   addons: ProposalAddon[];
   thirdParties: ProposalThirdParty[];
+};
+
+/** Lo que el panel lee del manifiesto `#foxcode-proposal` del HTML subido. */
+export type ProposalManifest = {
+  client: string;
+  title: string;
+  validDays: number;
+  items: { module: string; weeks?: number; bullets?: string[] }[];
+  addons?: { id: string; name: string; description?: string; price: number }[];
+  sections: { id: string; label: string }[];
 };
 
 export type ProposalDetail = Proposal & {
