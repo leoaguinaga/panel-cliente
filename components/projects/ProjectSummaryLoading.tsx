@@ -2,7 +2,7 @@
 
 import { Skeleton } from 'boneyard-js/react';
 
-function ProjectSummaryFixture() {
+export function ProjectSummaryFixture() {
   return (
     <div className="space-y-5" aria-hidden="true">
       <header className="space-y-4">

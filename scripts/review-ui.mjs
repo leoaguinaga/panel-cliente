@@ -61,15 +61,16 @@ try {
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
         const record = { role, width, path, status: response.status(), finalPath: new URL(page.url()).pathname, overflow, errors, accessibility };
         report.pages.push(record);
-        if (record.status !== 200 || record.finalPath !== path || overflow || errors.length || accessibility.length) failed = true;
+        if (record.status !== 200 || record.finalPath !== (path === '/internal/services' ? '/internal/settings' : path) || overflow || errors.length || accessibility.length) failed = true;
         if (path.endsWith('/demos') || path.endsWith('/dashboard'))
           await page.screenshot({ path: `${out}/${role}-${width}-${path.endsWith('/demos') ? 'demos' : 'dashboard'}.png`, fullPage: true });
         page.off('pageerror', handler);
       }
     }
     if (role === 'WORKER') {
-      await page.goto(`${base}/internal/settings`);
-      report.checks.push({ name: 'Worker cannot open administration', pass: new URL(page.url()).pathname === '/internal/dashboard' });
+      await page.goto(`${base}/internal/settings`, { waitUntil: 'networkidle' });
+      await page.waitForURL(`${base}/internal/profile#preferencias`);
+      report.checks.push({ name: 'Worker settings redirect to personal preferences', pass: new URL(page.url()).pathname === '/internal/profile' && new URL(page.url()).hash === '#preferencias' });
     }
     if (role === 'A') {
       await page.goto(`${base}/internal/products`);
@@ -86,23 +87,26 @@ try {
     }
     if (role === 'ADMIN') {
       await page.goto(`${base}/internal/products/${product.id}/demos`);
-      await page.getByLabel('Empresa o negocio').last().fill('   ');
+      await page.getByRole('button', { name: 'Nueva demo', exact: true }).first().click();
+      await page.getByLabel(/Empresa o negocio/).fill('   ');
       await page.getByRole('button', { name: 'Registrar demo' }).click();
       await page.getByRole('alert').filter({ hasText: 'Empresa obligatoria' }).waitFor();
       report.checks.push({ name: 'Demo server validation shows actionable error', pass: true });
-      await page.getByLabel('Empresa o negocio').last().fill('Hotel browser acceptance');
+      await page.getByLabel(/Empresa o negocio/).fill('Hotel browser acceptance');
       await page.getByLabel('Correo', { exact: true }).last().fill('browser@example.test');
       await page.getByRole('button', { name: 'Registrar demo' }).click();
-      await page.getByRole('heading', { name: 'Hotel browser acceptance', exact: true }).waitFor();
+      await page.getByText('Hotel browser acceptance', { exact: true }).waitFor();
       report.checks.push({ name: 'Create demo through server action', pass: true });
-      await page.getByText('Editar seguimiento de Hotel browser acceptance', { exact: true }).click();
-      const article = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Hotel browser acceptance', exact: true }) });
+      await page.getByRole('button', { name: 'Editar seguimiento de Hotel browser acceptance', exact: true }).click();
+      const article = page.getByRole('dialog');
       await article.locator('select[name="status"]').selectOption('BETA_USER');
-      await article.getByLabel('Notas y próxima acción').fill('Browser verified');
+      await article.getByLabel('Notas', { exact: true }).fill('Browser verified');
       await article.getByRole('button', { name: 'Guardar seguimiento' }).click();
-      await article.locator('span').filter({ hasText: /^Usuario beta$/ }).waitFor();
+      await article.waitFor({ state: 'hidden' });
+      await page.getByText('Usuario beta', { exact: true }).last().waitFor();
       report.checks.push({ name: 'Update demo through server action', pass: (await apiJson(`/catalogs/products/${product.id}/demos?status=BETA_USER`)).some(item => item.companyName === 'Hotel browser acceptance' && item.notes === 'Browser verified') });
-      await page.getByLabel('Empresa o negocio').last().focus();
+      await page.getByRole('button', { name: 'Nueva demo', exact: true }).first().click();
+      await page.getByLabel(/Empresa o negocio/).focus();
       await page.keyboard.press('Tab');
       const focused = await page.evaluate(() => ({ tag: document.activeElement.tagName, outline: getComputedStyle(document.activeElement).outlineStyle }));
       report.checks.push({ name: 'Keyboard focus reaches an interactive control', pass: ['A', 'BUTTON', 'SELECT', 'INPUT', 'SUMMARY', 'TEXTAREA'].includes(focused.tag), focused });

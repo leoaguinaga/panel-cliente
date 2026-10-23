@@ -64,13 +64,13 @@ export function WeekStrip({ today, todayCount, items }: { today: string; todayCo
 
               <div className="min-w-0 space-y-1.5 self-center md:self-auto">
                 {isToday && todayCount === 0 ? (
-                  <p className="px-2 py-1.5 text-[13px] text-muted-foreground/70">Nada para hoy</p>
+                  <p className="px-2 py-1.5 text-[13px] text-muted-foreground">Nada para hoy</p>
                 ) : isToday ? (
                   <a href="#hoy" className="block rounded-lg px-2 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <span className="font-semibold text-foreground tabular-nums">{todayCount}</span> {todayCount === 1 ? 'pendiente' : 'pendientes'} arriba
                   </a>
                 ) : dayItems.length === 0 ? (
-                  <p className="px-2 py-1.5 text-[13px] text-muted-foreground/70">{weekend ? '—' : 'Libre'}</p>
+                  <p className="px-2 py-1.5 text-[13px] text-muted-foreground">{weekend ? '—' : 'Libre'}</p>
                 ) : (
                   <>
                     {dayItems.slice(0, PER_DAY).map((item) => <WeekEvent key={item.id} item={item} />)}

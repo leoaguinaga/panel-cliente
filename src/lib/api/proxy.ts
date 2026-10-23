@@ -9,6 +9,7 @@ export async function proxyBackend(request: Request, path: string) {
   for (const name of ['cookie', 'content-type', 'accept', 'origin', 'user-agent']) {
     const value = request.headers.get(name); if (value) headers.set(name, value);
   }
+  if (process.env.PANEL_PROXY_KEY) headers.set('x-panel-proxy-key', process.env.PANEL_PROXY_KEY);
   headers.set('x-forwarded-host', url.host);
   headers.set('x-forwarded-proto', url.protocol.slice(0, -1));
   try {
