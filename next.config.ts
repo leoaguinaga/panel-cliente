@@ -13,7 +13,9 @@ if (backendEnv?.DATABASE_URL && !process.env.TEST_DATABASE_URL) process.env.DATA
 config({ path: '../.env', override: false, quiet: true });
 
 const nextConfig: NextConfig = {
-  outputFileTracingRoot: path.resolve(process.cwd(), ".."),
+  // En Vercel el repo es solo el frontend: el padre de cwd (/vercel) rompe la ruta
+  // de .next (path0/path0), así que la raíz de trazado solo se fija en el monorepo local.
+  ...(process.env.VERCEL ? {} : { outputFileTracingRoot: path.resolve(process.cwd(), "..") }),
   ...(process.env.TEST_DATABASE_URL ? { distDir: ".next-calendar-review" } : {}),
   serverExternalPackages: ['@prisma/client', 'prisma', 'better-auth'],
 };
