@@ -11,6 +11,8 @@ export type Entry = {
   creatorId: string;
   visibility: string;
   projectId: string | null;
+  leadId?: string | null;
+  leadName?: string | null;
   notes: string;
   attendees: string[];
   useMeet: boolean;
@@ -40,6 +42,7 @@ export type Options = {
   userId: string;
   isAdmin: boolean;
   workers: { id: string; name: string; email: string }[];
+  leads: { id: string; name: string; companyName: string | null }[];
   projects: {
     id: string;
     name: string;

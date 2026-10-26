@@ -237,6 +237,7 @@ export function CalendarWorkspace() {
       ownerId: f.get("ownerId"),
       visibility: f.get("visibility"),
       projectId: f.get("projectId") || undefined,
+      leadId: String(f.get("leadId") || ""),
       notes: f.get("notes") || "",
       attendees: String(f.get("attendees") || "")
         .split(/[,;\n]/)
@@ -740,6 +741,26 @@ export function CalendarWorkspace() {
                     ))}
                   </select>
                 </label>
+                <label>
+                  Lead (opcional)
+                  <select
+                    name="leadId"
+                    defaultValue={form.entry?.leadId || ""}
+                  >
+                    <option value="">Sin lead</option>
+                    {form.entry?.leadId &&
+                      !options.leads.some((l) => l.id === form.entry!.leadId) && (
+                        <option value={form.entry.leadId}>
+                          {form.entry.leadName || "Lead actual"}
+                        </option>
+                      )}
+                    {options.leads.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.companyName ? `${l.companyName} · ${l.name}` : l.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 {form.kind === "meeting" && (
                   <>
                     <label>
@@ -867,6 +888,14 @@ export function CalendarWorkspace() {
                 <br />
                 {detail.owner}
               </p>
+              {detail.entry?.leadId && (
+                <p className={styles.muted}>
+                  Lead:{" "}
+                  <Link href={`/internal/leads/${detail.entry.leadId}`}>
+                    {detail.entry.leadName || "Ver lead"}
+                  </Link>
+                </p>
+              )}
               {detail.href && (
                 <Button asChild variant="outline">
                   <Link href={detail.href}>
@@ -931,27 +960,51 @@ export function CalendarWorkspace() {
                       >
                         Editar
                       </Button>
-                      {detail.entry.kind === "reminder" && (
-                        <Button
-                          variant="outline"
-                          disabled={busy}
-                          onClick={() =>
-                            void mutate(
-                              () =>
-                                api("entries/" + detail.entry!.id, {
-                                  method: "PATCH",
-                                  body: JSON.stringify({
-                                    ...payload(detail.entry!),
-                                    status: "DONE",
-                                  }),
-                                }),
-                              "Recordatorio completado.",
-                            )
-                          }
-                        >
-                          Marcar completado
-                        </Button>
-                      )}
+                      {(
+                        [
+                          ["DONE", "completado", "Marcar completado"],
+                          ["LOST", "perdido", "Marcar perdido"],
+                        ] as const
+                      )
+                        .filter(
+                          ([status]) =>
+                            detail.entry!.kind === "meeting" ||
+                            status === "DONE",
+                        )
+                        .map(([status, , label]) => {
+                          const meeting = detail.entry!.kind === "meeting";
+                          const text = meeting
+                            ? status === "DONE"
+                              ? "Marcar realizada"
+                              : "Marcar perdida"
+                            : label;
+                          return (
+                            <Button
+                              key={status}
+                              variant="outline"
+                              disabled={busy}
+                              onClick={() =>
+                                void mutate(
+                                  () =>
+                                    api("entries/" + detail.entry!.id, {
+                                      method: "PATCH",
+                                      body: JSON.stringify({
+                                        ...payload(detail.entry!),
+                                        status,
+                                      }),
+                                    }),
+                                  status === "DONE"
+                                    ? meeting
+                                      ? "Reunión realizada."
+                                      : "Recordatorio completado."
+                                    : "Reunión marcada como perdida.",
+                                )
+                              }
+                            >
+                              {text}
+                            </Button>
+                          );
+                        })}
                       {["ERROR", "PENDING", "SYNCING"].includes(
                         detail.entry.syncStatus,
                       ) && (
