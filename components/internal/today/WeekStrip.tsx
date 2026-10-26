@@ -6,6 +6,7 @@ const PER_DAY = 3;
 const legend = [
   { label: 'Tareas', dot: kindDot.task },
   { label: 'Leads', dot: kindDot.lead },
+  { label: 'Reuniones', dot: kindDot.meeting },
   { label: 'Demos', dot: kindDot.demo },
   { label: 'Entregas', dot: kindDot.deliverable },
   { label: 'Hitos en revisión', dot: kindDot.milestone_review },
@@ -102,7 +103,7 @@ function WeekEvent({ item }: { item: TodayItem }) {
     >
       <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
         <span aria-hidden className={`size-1.5 shrink-0 rounded-full ${kindDot[item.kind]}`} />
-        {kindLabels[item.kind]}
+        {kindLabels[item.kind]}{item.time ? ` · ${item.time}` : ''}
         {money && <span className="ml-auto tabular-nums text-foreground/80">{money}</span>}
       </span>
       <span className="mt-0.5 line-clamp-2 text-[13px] leading-snug font-medium">{item.title}</span>

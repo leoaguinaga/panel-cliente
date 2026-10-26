@@ -11,6 +11,8 @@ export const kindLabels: Record<TodayItemKind, string> = {
   payment_due: 'Cobro',
   project_unassigned: 'Sin responsable',
   task_blocked: 'Bloqueada',
+  meeting: 'Reunión',
+  reminder: 'Recordatorio',
 };
 
 /** Clases del distintivo por tipo; el color separa trabajo, comercial, dinero y alertas. */
@@ -25,6 +27,8 @@ export const kindTone: Record<TodayItemKind, string> = {
   payment_due: 'bg-emerald-50 text-emerald-800',
   project_unassigned: 'bg-red-50 text-red-700',
   task_blocked: 'bg-red-50 text-red-700',
+  meeting: 'bg-sky-50 text-sky-800',
+  reminder: 'bg-muted text-foreground/75',
 };
 
 /** Color sólido del punto en el calendario semanal. */
@@ -39,6 +43,8 @@ export const kindDot: Record<TodayItemKind, string> = {
   payment_due: 'bg-emerald-500',
   project_unassigned: 'bg-red-500',
   task_blocked: 'bg-red-500',
+  meeting: 'bg-sky-500',
+  reminder: 'bg-stone-400',
 };
 
 export const actionLabels: Record<TodayItemKind, string> = {
@@ -52,6 +58,8 @@ export const actionLabels: Record<TodayItemKind, string> = {
   payment_due: 'Ver cobro',
   project_unassigned: 'Asignar responsable',
   task_blocked: 'Ver bloqueo',
+  meeting: 'Ver en calendario',
+  reminder: 'Ver en calendario',
 };
 
 export function itemHref(item: TodayItem) {
@@ -73,6 +81,9 @@ export function itemHref(item: TodayItem) {
       return '/internal/payments?status=UNDER_REVIEW';
     case 'payment_due':
       return ref.projectId ? `/internal/projects/${ref.projectId}/documentation/payments` : '/internal/payments';
+    case 'meeting':
+    case 'reminder':
+      return '/internal/calendar';
     case 'project_unassigned':
       return `/internal/projects/${ref.projectId}/settings`;
   }
@@ -104,7 +115,8 @@ export function whenLabel(item: TodayItem, today: string) {
   if (item.kind === 'milestone_review') return diff <= 0 ? 'desde hoy' : `hace ${diff} ${diff === 1 ? 'día' : 'días'}`;
   if (item.kind === 'task_blocked') return diff <= 0 ? 'desde hoy' : `hace ${diff} ${diff === 1 ? 'día' : 'días'}`;
   if (item.kind === 'payment_review') return 'por revisar';
-  if (diff === 0) return item.kind === 'demo' || item.kind === 'lead' || item.kind === 'demo_follow_up' ? 'hoy' : 'vence hoy';
+  if (diff === 0 && item.time) return item.time;
+  if (diff === 0) return item.kind === 'demo' || item.kind === 'lead' || item.kind === 'meeting' || item.kind === 'reminder' || item.kind === 'demo_follow_up' ? 'hoy' : 'vence hoy';
   if (diff === 1) return 'ayer';
   if (diff > 1) return `hace ${diff} días`;
   return null;

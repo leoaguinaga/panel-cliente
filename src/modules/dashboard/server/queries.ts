@@ -40,11 +40,13 @@ export async function getClientDashboard() {
   }>(`/dashboard/client`);
 }
 
-export type TodayItemKind = 'task' | 'lead' | 'demo' | 'demo_follow_up' | 'deliverable' | 'milestone_review' | 'payment_review' | 'payment_due' | 'project_unassigned' | 'task_blocked';
+export type TodayItemKind = 'task' | 'lead' | 'demo' | 'demo_follow_up' | 'deliverable' | 'milestone_review' | 'payment_review' | 'payment_due' | 'project_unassigned' | 'task_blocked' | 'meeting' | 'reminder';
 export type TodayItem = {
   id: string; kind: TodayItemKind; title: string; context: string;
   /** Día calendario YYYY-MM-DD (America/Lima). */
   date: string | null;
+  /** Hora HH:mm de reuniones y recordatorios. */
+  time?: string | null;
   ref: { taskId?: string; projectId?: string; leadId?: string; productId?: string; demoId?: string; paymentId?: string };
   status?: string; unassigned?: boolean; amount?: { value: number; currency: string };
 };
