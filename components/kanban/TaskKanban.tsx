@@ -12,6 +12,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { formatCompactDate, formatProjectPriority, formatTaskStatus, taskCode } from '@/lib/formatters';
 import { createTaskQuickAction, setTaskStatusAction } from '@/src/modules/projects/server/task-actions';
 import type { ProjectMilestone, ProjectRequirement, ProjectSprint, ProjectTask, ProjectWorker } from '@/src/modules/projects/types';
+import type { CatalogProduct } from '@/src/modules/products/server/queries';
 
 export type TaskItem = Omit<ProjectTask, 'evidences'> & { evidences?: TaskEvidenceItem[] };
 
@@ -36,6 +37,8 @@ export function TaskKanban({
   requirements = [],
   milestones = [],
   workers = [],
+  products = [],
+  leads = [],
 }: {
   projectId: string;
   initialTasks: TaskItem[];
@@ -44,6 +47,8 @@ export function TaskKanban({
   requirements?: ProjectRequirement[];
   milestones?: ProjectMilestone[];
   workers?: ProjectWorker[];
+  products?: Pick<CatalogProduct, 'id' | 'name'>[];
+  leads?: Array<{ id: string; name: string; companyName?: string | null }>;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -121,6 +126,8 @@ export function TaskKanban({
         plannedStartDate: value('plannedStartDate'),
         dueDate: value('dueDate'),
         estimateHours: estimate ? Number(estimate) : null,
+        productId: value('productId'),
+        leadId: value('leadId'),
       });
       if (!result.ok) {
         setNewTaskError(result.error);
@@ -258,6 +265,7 @@ export function TaskKanban({
               {usesSprints && <label className="block text-sm font-medium">Sprint<select name="sprintId" defaultValue={sprints.find((sprint) => sprint.status === 'ACTIVE')?.id || ''} className={field}><option value="">Sin sprint</option>{sprints.map((sprint) => <option key={sprint.id} value={sprint.id}>{sprint.name}</option>)}</select></label>}
             </div>
             <label className="block text-sm font-medium">Requerimiento<select name="requirementId" defaultValue="" className={field}><option value="">Sin requerimiento</option>{requirements.map((requirement) => <option key={requirement.id} value={requirement.id}>{requirement.code ? `${requirement.code} · ` : ''}{requirement.title}</option>)}</select><span className="mt-1 block text-xs font-normal text-muted-foreground">Si el requerimiento tiene hito, la tarea toma ese hito.</span></label>
+            <div className="grid grid-cols-2 gap-2.5"><label className="block text-sm font-medium">Producto<select name="productId" defaultValue="" className={field}><option value="">Ninguno</option>{products.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label className="block text-sm font-medium">Lead<select name="leadId" defaultValue="" className={field}><option value="">Ninguno</option>{leads.map((item) => <option key={item.id} value={item.id}>{item.name}{item.companyName ? ` · ${item.companyName}` : ''}</option>)}</select></label></div>
             {newTaskError && <p role="alert" className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{newTaskError}</p>}
             <div className="flex justify-end gap-2 border-t pt-3">
               <Button type="button" variant="outline" size="sm" onClick={() => setNewTaskStatus(null)}>Cancelar</Button>

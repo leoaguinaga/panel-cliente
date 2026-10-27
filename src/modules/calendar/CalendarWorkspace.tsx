@@ -238,6 +238,7 @@ export function CalendarWorkspace() {
       visibility: f.get("visibility"),
       projectId: f.get("projectId") || undefined,
       leadId: String(f.get("leadId") || ""),
+      productId: String(f.get("productId") || ""),
       notes: f.get("notes") || "",
       attendees: String(f.get("attendees") || "")
         .split(/[,;\n]/)
@@ -275,11 +276,12 @@ export function CalendarWorkspace() {
     setReload((v) => v + 1);
   };
   const spaces = Array.from(
-    new Map(
-      options?.projects
+    new Map([
+      ...(options?.projects
         .filter((p) => p.productId)
-        .map((p) => [p.productId!, p.product!.name]),
-    ).entries(),
+        .map((p) => [p.productId!, p.product!.name] as const) ?? []),
+      ...(options?.products.map((p) => [p.id, p.name] as const) ?? []),
+    ]).entries(),
   );
   return (
     <div className={styles.root}>
@@ -735,6 +737,20 @@ export function CalendarWorkspace() {
                   >
                     <option value="">Sin proyecto</option>
                     {options.projects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Producto (opcional)
+                  <select
+                    name="productId"
+                    defaultValue={form.entry?.productId || ""}
+                  >
+                    <option value="">Sin producto</option>
+                    {options.products.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name}
                       </option>

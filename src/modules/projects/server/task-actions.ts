@@ -8,6 +8,8 @@ export type TaskActionResult = { ok: true; error: null } | { ok: false; error: s
 
 export type TaskPatch = Partial<{
   title: string;
+  productId: string | null;
+  leadId: string | null;
   description: string | null;
   status: string;
   priority: string;
@@ -51,7 +53,7 @@ export async function setTaskStatusAction(projectId: string, taskId: string, sta
 
 export async function createTaskQuickAction(
   projectId: string,
-  input: { title: string; status?: string; priority?: string; parentId?: string; assignedToId?: string | null; reviewerId?: string | null; sprintId?: string | null; requirementId?: string | null; milestoneId?: string | null; plannedStartDate?: string | null; dueDate?: string | null; estimateHours?: number | null },
+  input: { title: string; status?: string; priority?: string; parentId?: string; assignedToId?: string | null; reviewerId?: string | null; sprintId?: string | null; requirementId?: string | null; milestoneId?: string | null; plannedStartDate?: string | null; dueDate?: string | null; estimateHours?: number | null; productId?: string | null; leadId?: string | null },
 ) {
   const body = Object.fromEntries(Object.entries(input).filter(([, value]) => value !== '' && value !== null && value !== undefined));
   return run(projectId, () => backendFetch(`/projects/${projectId}/tasks`, json('POST', body)));

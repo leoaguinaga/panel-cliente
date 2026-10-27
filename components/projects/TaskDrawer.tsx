@@ -20,6 +20,7 @@ import {
   type TaskPatch,
 } from '@/src/modules/projects/server/task-actions';
 import type { ProjectMilestone, ProjectRequirement, ProjectSprint, ProjectTask, ProjectWorker, TaskDetail, TaskPerson } from '@/src/modules/projects/types';
+import type { CatalogProduct } from '@/src/modules/products/server/queries';
 
 const STATUSES = ['TODO', 'IN_PROGRESS', 'REVIEW', 'BLOCKED', 'DONE'] as const;
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const;
@@ -49,6 +50,8 @@ export function TaskDrawer({
   requirements,
   usesSprints,
   currentUser,
+  products = [],
+  leads = [],
 }: {
   projectId: string;
   task: TaskDetail;
@@ -59,6 +62,8 @@ export function TaskDrawer({
   requirements: ProjectRequirement[];
   usesSprints: boolean;
   currentUser: { id: string; role: string };
+  products?: Pick<CatalogProduct, 'id' | 'name'>[];
+  leads?: Array<{ id: string; name: string; companyName?: string | null }>;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -186,6 +191,18 @@ export function TaskDrawer({
             <select id="task-assignee" defaultValue={task.assignedTo?.id || ''} onChange={(event) => save(event.currentTarget, { assignedToId: event.target.value || null }, task.assignedTo?.id || '')} className={field}>
               <option value="">Sin responsable</option>
               {workers.map((worker) => <option key={worker.id} value={worker.id}>{worker.name}</option>)}
+            </select>
+
+            <label htmlFor="task-product" className="text-slate-500">Producto</label>
+            <select id="task-product" value={task.productId || ''} disabled={pending} onChange={(event) => save(event.currentTarget, { productId: event.target.value || null, leadId: null }, task.productId || '')} className={field}>
+              <option value="">Ninguno</option>
+              {products.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+
+            <label htmlFor="task-lead" className="text-slate-500">Lead</label>
+            <select id="task-lead" value={task.leadId || ''} disabled={pending} onChange={(event) => save(event.currentTarget, { leadId: event.target.value || null, productId: null }, task.leadId || '')} className={field}>
+              <option value="">Ninguno</option>
+              {leads.map((item) => <option key={item.id} value={item.id}>{item.name}{item.companyName ? ` · ${item.companyName}` : ''}</option>)}
             </select>
 
             <label htmlFor="task-reviewer" className="text-slate-500">Revisor</label>

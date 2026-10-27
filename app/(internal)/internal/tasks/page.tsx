@@ -1,5 +1,5 @@
 import { getProjectTasks, getProjectsOverview, getTaskBoard, getTaskDetail, getTaskFacets } from '@/src/modules/projects/server/queries';
-import { getWorkers } from '@/src/modules/leads/server/queries';
+import { getLeads, getWorkers } from '@/src/modules/leads/server/queries';
 import { getCatalogs } from '@/src/modules/products/server/queries';
 import { getSession } from '@/src/lib/auth';
 import { FilterBar, type FilterDef } from '@/components/internal/FilterBar';
@@ -16,12 +16,13 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const { task: taskId, taskProject, ...query } = await searchParams;
   const view = query.view || DEFAULT_VIEW;
   const effective = { ...query, view };
-  const [board, facets, workers, projects, catalogs, session, drawer] = await Promise.all([
+  const [board, facets, workers, projects, catalogs, leads, session, drawer] = await Promise.all([
     getTaskBoard(effective),
     getTaskFacets(effective),
     getWorkers(),
     getProjectsOverview(),
     getCatalogs(),
+    getLeads(),
     getSession(),
     // Detalle de la tarea abierta (?task=&taskProject=), con el contexto de su proyecto.
     taskId && taskProject ? Promise.all([getTaskDetail(taskProject, taskId), getProjectTasks(taskProject)]) : null,
@@ -47,6 +48,8 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         currentUser={currentUser}
         workers={workers}
         projects={projects.filter((project) => !CLOSED_PROJECTS.includes(project.status)).map((project) => ({ id: project.id, name: project.name }))}
+        products={catalogs.products.map((product) => ({ id: product.id, name: product.name }))}
+        leads={leads.map((lead) => ({ id: lead.id, name: `${lead.name}${lead.companyName ? ` · ${lead.companyName}` : ''}` }))}
         filterBar={
           // Elemento de servidor que el cliente pinta entre hermanos: sin key, React avisa en dev.
           <FilterBar
@@ -74,6 +77,8 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
           requirements={context.requirements}
           usesSprints={context.usesSprints}
           currentUser={{ id: session.user.id, role: session.user.role }}
+          products={catalogs.products.map((product) => ({ id: product.id, name: product.name }))}
+          leads={leads.map((lead) => ({ id: lead.id, name: lead.name, companyName: lead.companyName }))}
         />
       )}
     </>

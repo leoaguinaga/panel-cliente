@@ -81,6 +81,10 @@ export type ProjectTask = {
   id: string;
   number: number;
   projectId: string;
+  productId?: string | null;
+  product?: { id: string; name: string } | null;
+  leadId?: string | null;
+  lead?: { id: string; name: string; companyName?: string | null } | null;
   parentId: string | null;
   /** Estado previo mientras está BLOCKED (la tarjeta se dibuja en esa columna). */
   blockedFromStatus?: Exclude<ProjectTask['status'], 'BLOCKED'> | null;

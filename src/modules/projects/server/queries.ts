@@ -61,6 +61,8 @@ export type BoardTask = {
   blockedFromStatus: Exclude<BoardTask['status'], 'BLOCKED'> | null;
   parentId: string | null;
   project: { id: string; name: string };
+  product?: { id: string; name: string } | null;
+  lead?: { id: string; name: string; companyName?: string | null } | null;
   parent: { id: string; number: number; title: string } | null;
   assignedTo: { id: string; name: string } | null;
   reviewer: { id: string; name: string } | null;

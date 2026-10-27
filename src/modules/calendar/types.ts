@@ -12,6 +12,7 @@ export type Entry = {
   visibility: string;
   projectId: string | null;
   leadId?: string | null;
+  productId?: string | null;
   leadName?: string | null;
   notes: string;
   attendees: string[];
@@ -43,6 +44,7 @@ export type Options = {
   isAdmin: boolean;
   workers: { id: string; name: string; email: string }[];
   leads: { id: string; name: string; companyName: string | null }[];
+  products: { id: string; name: string }[];
   projects: {
     id: string;
     name: string;

@@ -39,6 +39,8 @@ export function TeamTaskBoard({
   currentUser,
   workers,
   projects,
+  products,
+  leads,
   truncated,
   wipLimit,
   filterBar,
@@ -49,6 +51,8 @@ export function TeamTaskBoard({
   currentUser: Person;
   workers: Person[];
   projects: Person[];
+  products: Person[];
+  leads: Person[];
   truncated: boolean;
   filterBar: ReactNode;
 }) {
@@ -202,6 +206,8 @@ export function TeamTaskBoard({
         onClose={() => setCreating(null)}
         workers={workers}
         projects={projects}
+        products={products}
+        leads={leads}
         defaultProjectId={searchParams.get('projectId')?.split(',').length === 1 ? searchParams.get('projectId')! : ''}
       />
       {evidenceTask && <EvidenceModal projectId={evidenceTask.project.id} taskId={evidenceTask.id} taskTitle={evidenceTask.title} evidences={[]} isOpen onClose={() => setEvidenceTask(null)} />}
@@ -417,12 +423,16 @@ function QuickCreate({
   onClose,
   workers,
   projects,
+  products,
+  leads,
   defaultProjectId,
 }: {
   state: { status: Column['id']; assigneeId: string | null } | null;
   onClose: () => void;
   workers: Person[];
   projects: Person[];
+  products: Person[];
+  leads: Person[];
   defaultProjectId: string;
 }) {
   const [error, setError] = useState<string | null>(null);
@@ -433,15 +443,17 @@ function QuickCreate({
     const value = (key: string) => String(data.get(key) || '').trim() || null;
     const projectId = value('projectId');
     const title = value('title');
-    if (!projectId || !title || !state) return;
+    if (!title || !state) return;
     startTransition(async () => {
       setError(null);
-      const result = await createTaskQuickAction(projectId, {
+      const result = await createTaskQuickAction(projectId || '', {
         title,
         status: state.status,
         priority: value('priority') || 'MEDIUM',
         assignedToId: value('assignedToId'),
         dueDate: value('dueDate'),
+        productId: value('productId'),
+        leadId: value('leadId'),
       });
       if (!result.ok) return setError(result.error);
       onClose();
@@ -462,10 +474,8 @@ function QuickCreate({
             </label>
             <label className="block text-sm font-medium">
               Proyecto
-              <select name="projectId" required defaultValue={defaultProjectId} className={field}>
-                <option value="" disabled>
-                  Elige un proyecto
-                </option>
+              <select name="projectId" defaultValue={defaultProjectId} className={field}>
+                <option value="">Ninguno</option>
                 {projects.map((project) => (
                   <option key={project.id} value={project.id}>
                     {project.name}
@@ -473,6 +483,8 @@ function QuickCreate({
                 ))}
               </select>
             </label>
+            <label className="block text-sm font-medium">Producto<select name="productId" defaultValue="" className={field}><option value="">Ninguno</option>{products.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+            <label className="block text-sm font-medium">Lead<select name="leadId" defaultValue="" className={field}><option value="">Ninguno</option>{leads.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
             <div className="grid grid-cols-2 gap-3">
               <label className="block text-sm font-medium">
                 Responsable
