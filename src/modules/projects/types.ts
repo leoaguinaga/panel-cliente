@@ -80,7 +80,7 @@ export type ProjectPayment = {
 export type ProjectTask = {
   id: string;
   number: number;
-  projectId: string;
+  projectId: string | null;
   productId?: string | null;
   product?: { id: string; name: string } | null;
   leadId?: string | null;

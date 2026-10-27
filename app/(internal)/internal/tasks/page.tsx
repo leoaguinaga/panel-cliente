@@ -1,4 +1,4 @@
-import { getProjectTasks, getProjectsOverview, getTaskBoard, getTaskDetail, getTaskFacets } from '@/src/modules/projects/server/queries';
+import { getProjectTasks, getProjectsOverview, getTaskBoard, getTaskDetail, getTaskFacets, getUnassignedTaskDetail } from '@/src/modules/projects/server/queries';
 import { getLeads, getWorkers } from '@/src/modules/leads/server/queries';
 import { getCatalogs } from '@/src/modules/products/server/queries';
 import { getSession } from '@/src/lib/auth';
@@ -25,13 +25,17 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
     getLeads(),
     getSession(),
     // Detalle de la tarea abierta (?task=&taskProject=), con el contexto de su proyecto.
-    taskId && taskProject ? Promise.all([getTaskDetail(taskProject, taskId), getProjectTasks(taskProject)]) : null,
+    taskId
+      ? taskProject
+        ? Promise.all([getTaskDetail(taskProject, taskId), getProjectTasks(taskProject)])
+        : Promise.all([getUnassignedTaskDetail(taskId), Promise.resolve({ tasks: [], milestones: [], sprints: [], requirements: [], usesSprints: false })])
+      : null,
   ]);
   // Cada pestaña ya fija uno de los filtros: no se repite como pastilla.
   const filters: FilterDef[] = [
     ...(view === 'blocked' ? [] : [{ key: 'status', label: 'Estado', options: withCounts(TASK_STATUSES.map((status) => ({ value: status, label: formatTaskStatus(status) })), facets.status) }]),
     ...(view === 'mine' ? [] : [{ key: 'workerId', label: 'Responsable', options: withCounts(workerOptions(workers), facets.worker) }]),
-    { key: 'projectId', label: 'Proyecto', options: withCounts(namedOptions(projects), facets.project) },
+    { key: 'projectId', label: 'Proyecto', options: withCounts([...namedOptions(projects), { value: 'unassigned', label: 'Sin proyecto' }], facets.project) },
     ...(view === 'overdue' ? [] : [{ key: 'due', label: 'Vencimiento', single: true, options: DUE_OPTIONS }]),
     { key: 'productId', label: 'Producto', secondary: true, options: namedOptions(catalogs.products) },
     { key: 'serviceId', label: 'Servicio', secondary: true, options: namedOptions(catalogs.services) },
@@ -68,7 +72,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
       />
       {task && context && session && (
         <TaskDrawer
-          projectId={taskProject!}
+          projectId={taskProject || ''}
           task={task}
           tasks={context.tasks}
           workers={workers}

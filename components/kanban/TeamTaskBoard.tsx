@@ -73,7 +73,8 @@ export function TeamTaskBoard({
   const href = (task: BoardTask) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('task', task.id);
-    params.set('taskProject', task.project.id);
+    if (task.project?.id) params.set('taskProject', task.project.id);
+    else params.delete('taskProject');
     return `${pathname}?${params}`;
   };
   const doneHistoryHref = () => {
@@ -102,8 +103,8 @@ export function TeamTaskBoard({
     if (!sameStatus && target === 'REVIEW') setEvidenceTask({ ...task, status });
     startTransition(async () => {
       const result = sameAssignee
-        ? await setTaskStatusAction(task.project.id, task.id, status)
-        : await patchTaskAction(task.project.id, task.id, { ...(sameStatus ? {} : { status }), assignedToId: nextAssignee });
+        ? await setTaskStatusAction(task.project?.id ?? '', task.id, status)
+        : await patchTaskAction(task.project?.id ?? '', task.id, { ...(sameStatus ? {} : { status }), assignedToId: nextAssignee });
       if (!result.ok) {
         setTasks(previous);
         setError(`${taskCode(task.number)}: ${result.error}`);
@@ -119,7 +120,7 @@ export function TeamTaskBoard({
   const inProgress = (items: BoardTask[]) => items.filter((task) => columnOf(task) === 'IN_PROGRESS').length;
   const overdue = open.filter(isOverdue).length;
   const blocked = open.filter((task) => task.status === 'BLOCKED').length;
-  const projectCount = new Set(open.map((task) => task.project.id)).size;
+  const projectCount = new Set(open.map((task) => task.project?.id).filter(Boolean)).size;
 
   const cardProps = { href, dragProps, dragged, isOverdue, view };
 
@@ -210,7 +211,7 @@ export function TeamTaskBoard({
         leads={leads}
         defaultProjectId={searchParams.get('projectId')?.split(',').length === 1 ? searchParams.get('projectId')! : ''}
       />
-      {evidenceTask && <EvidenceModal projectId={evidenceTask.project.id} taskId={evidenceTask.id} taskTitle={evidenceTask.title} evidences={[]} isOpen onClose={() => setEvidenceTask(null)} />}
+      {evidenceTask && <EvidenceModal projectId={evidenceTask.project?.id} taskId={evidenceTask.id} taskTitle={evidenceTask.title} evidences={[]} isOpen onClose={() => setEvidenceTask(null)} />}
     </section>
   );
 }
@@ -239,7 +240,7 @@ function TaskCard({ task, href, dragProps, dragged, isOverdue, view, compact = f
       {!compact && (
         <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
           <span className="shrink-0 font-mono text-[10.5px]">{taskCode(task.number)}</span>
-          <span className="min-w-0 truncate rounded border px-1.5 font-semibold">{task.project.name}</span>
+          <span className="min-w-0 truncate rounded border px-1.5 font-semibold">{task.project?.name ?? 'Sin proyecto'}</span>
           {(task.priority === 'URGENT' || task.priority === 'HIGH') && (
             <span className={cn('ml-auto shrink-0 rounded px-1.5 text-[10px] font-bold uppercase tracking-wide', task.priority === 'URGENT' ? 'bg-rose-500/15 text-rose-400' : 'bg-amber-500/15 text-amber-400')}>
               {formatProjectPriority(task.priority)}
@@ -272,7 +273,7 @@ function TaskCard({ task, href, dragProps, dragged, isOverdue, view, compact = f
             {days} d
           </span>
         )}
-        {compact && <span className="truncate">{task.project.name}</span>}
+        {compact && <span className="truncate">{task.project?.name ?? 'Sin proyecto'}</span>}
         {!compact && task.subtasks.length > 0 && (
           <span className="inline-flex items-center gap-1" title="Subtareas terminadas">
             <ListChecks className="size-3" aria-hidden />
@@ -436,35 +437,36 @@ function QuickCreate({
   defaultProjectId: string;
 }) {
   const [error, setError] = useState<string | null>(null);
+  const [association, setAssociation] = useState<'none' | 'project' | 'product' | 'lead'>(defaultProjectId ? 'project' : 'none');
   const [pending, startTransition] = useTransition();
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const value = (key: string) => String(data.get(key) || '').trim() || null;
-    const projectId = value('projectId');
+    const projectId = association === 'project' ? value('projectId') : null;
     const title = value('title');
     if (!title || !state) return;
     startTransition(async () => {
       setError(null);
-      const result = await createTaskQuickAction(projectId || '', {
+      const result = await createTaskQuickAction(projectId ?? '', {
         title,
         status: state.status,
         priority: value('priority') || 'MEDIUM',
         assignedToId: value('assignedToId'),
         dueDate: value('dueDate'),
-        productId: value('productId'),
-        leadId: value('leadId'),
+        productId: association === 'product' ? value('productId') : null,
+        leadId: association === 'lead' ? value('leadId') : null,
       });
       if (!result.ok) return setError(result.error);
       onClose();
     });
   };
   return (
-    <Sheet open={state !== null} onOpenChange={(open) => { if (!open) { setError(null); onClose(); } }}>
+    <Sheet open={state !== null} onOpenChange={(open) => { if (open) setAssociation(defaultProjectId ? 'project' : 'none'); else { setError(null); onClose(); } }}>
       <SheetContent side="right" className="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>Nueva tarea</SheetTitle>
-          <SheetDescription>Se crea en «{formatTaskStatus(state?.status ?? 'TODO')}». El resto de campos se completan desde su detalle.</SheetDescription>
+          <SheetDescription>Se crea en «{formatTaskStatus(state?.status ?? 'TODO')}». Elige un solo vínculo; puedes dejarla sin vínculo.</SheetDescription>
         </SheetHeader>
         {state && (
           <form key={`${state.status}-${state.assigneeId}`} onSubmit={submit} className="space-y-3">
@@ -472,19 +474,19 @@ function QuickCreate({
               Título
               <input name="title" required maxLength={200} autoFocus placeholder="Ej. Maquetar la página de inicio" className={field} />
             </label>
-            <label className="block text-sm font-medium">
-              Proyecto
-              <select name="projectId" defaultValue={defaultProjectId} className={field}>
-                <option value="">Ninguno</option>
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block text-sm font-medium">Producto<select name="productId" defaultValue="" className={field}><option value="">Ninguno</option>{products.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-            <label className="block text-sm font-medium">Lead<select name="leadId" defaultValue="" className={field}><option value="">Ninguno</option>{leads.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium">Vínculo</legend>
+              <div className="grid grid-cols-4 gap-1 rounded-lg border bg-muted/40 p-1" role="group" aria-label="Tipo de vínculo">
+                {(['none', 'project', 'product', 'lead'] as const).map((value) => {
+                  const label = { none: 'Ninguno', project: 'Proyecto', product: 'Producto', lead: 'Lead' }[value];
+                  return <button key={value} type="button" aria-pressed={association === value} onClick={() => setAssociation(value)} className={cn('min-h-8 rounded-md px-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', association === value ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>{label}</button>;
+                })}
+              </div>
+              {association === 'none' && <p className="text-xs text-muted-foreground">La tarea quedará independiente, sin proyecto, producto ni lead.</p>}
+              {association === 'project' && <label className="block text-sm font-medium"><span className="sr-only">Proyecto</span><select name="projectId" required defaultValue={defaultProjectId} className={field} aria-label="Seleccionar proyecto"><option value="">Seleccionar proyecto</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>}
+              {association === 'product' && <label className="block text-sm font-medium"><span className="sr-only">Producto</span><select name="productId" required defaultValue="" className={field} aria-label="Seleccionar producto"><option value="">Seleccionar producto</option>{products.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}
+              {association === 'lead' && <label className="block text-sm font-medium"><span className="sr-only">Lead</span><select name="leadId" required defaultValue="" className={field} aria-label="Seleccionar lead"><option value="">Seleccionar lead</option>{leads.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}
+            </fieldset>
             <div className="grid grid-cols-2 gap-3">
               <label className="block text-sm font-medium">
                 Responsable

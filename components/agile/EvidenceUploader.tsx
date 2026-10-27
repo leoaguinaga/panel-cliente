@@ -38,7 +38,7 @@ export function EvidenceModal({
   isOpen,
   onClose,
 }: {
-  projectId: string;
+  projectId?: string;
   taskId: string;
   taskTitle: string;
   evidences: TaskEvidenceItem[];
@@ -139,7 +139,7 @@ export function EvidenceModal({
     }
     setError(null);
     startTransition(async () => {
-      const result = await addTaskEvidenceAction(projectId, taskId, {
+      const result = await addTaskEvidenceAction(projectId ?? '', taskId, {
         kind,
         title: title.trim() || undefined,
         fileUrl: kind === 'LINK' ? link.trim() : kind === 'IMAGE' ? image! : undefined,
@@ -158,7 +158,7 @@ export function EvidenceModal({
   const handleDelete = (evidenceId: string) => {
     startTransition(async () => {
       try {
-        await deleteTaskEvidenceAction(projectId, taskId, evidenceId);
+        await deleteTaskEvidenceAction(projectId ?? '', taskId, evidenceId);
         setItems((prev) => prev.filter((it) => it.id !== evidenceId));
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Error al eliminar');

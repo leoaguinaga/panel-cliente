@@ -8,6 +8,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { EvidenceModal } from '@/components/agile/EvidenceUploader';
 import { TaskDependencyEditor } from '@/components/projects/TaskDependencyEditor';
 import { formatCompactDate, formatProjectPriority, formatTaskStatus, taskCode } from '@/lib/formatters';
+import { cn } from '@/lib/utils';
 import {
   addTaskCommentAction,
   createTaskQuickAction,
@@ -72,6 +73,8 @@ export function TaskDrawer({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [status, setStatus] = useState(task.status);
+  const [association, setAssociation] = useState<'none' | 'product' | 'lead'>(task.productId ? 'product' : task.leadId ? 'lead' : 'none');
+  const [associationId, setAssociationId] = useState(task.productId || task.leadId || '');
   // El hito se hereda de la tarea principal o del requerimiento (si este tiene hito)
   const requirementMilestone = requirements.find((requirement) => requirement.id === task.requirement?.id)?.milestoneId;
   const inheritedMilestone = task.parentId
@@ -193,17 +196,37 @@ export function TaskDrawer({
               {workers.map((worker) => <option key={worker.id} value={worker.id}>{worker.name}</option>)}
             </select>
 
-            <label htmlFor="task-product" className="text-slate-500">Producto</label>
-            <select id="task-product" value={task.productId || ''} disabled={pending} onChange={(event) => save(event.currentTarget, { productId: event.target.value || null, leadId: null }, task.productId || '')} className={field}>
-              <option value="">Ninguno</option>
-              {products.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-            </select>
-
-            <label htmlFor="task-lead" className="text-slate-500">Lead</label>
-            <select id="task-lead" value={task.leadId || ''} disabled={pending} onChange={(event) => save(event.currentTarget, { leadId: event.target.value || null, productId: null }, task.leadId || '')} className={field}>
-              <option value="">Ninguno</option>
-              {leads.map((item) => <option key={item.id} value={item.id}>{item.name}{item.companyName ? ` · ${item.companyName}` : ''}</option>)}
-            </select>
+            {projectId ? (
+              <div className="space-y-1.5 rounded-lg border border-slate-200 bg-muted/30 p-3">
+                <p className="text-xs font-semibold text-slate-700">Vínculo: proyecto</p>
+                <p className="text-xs text-slate-500">Esta tarea pertenece al proyecto actual. Solo puede tener un vínculo.</p>
+              </div>
+            ) : (
+              <fieldset className="space-y-2">
+                <legend className="text-xs font-medium text-slate-500">Vínculo</legend>
+                <div className="grid grid-cols-3 gap-1 rounded-lg border border-slate-200 bg-muted/40 p-1" role="group" aria-label="Tipo de vínculo de la tarea">
+                  {(['none', 'product', 'lead'] as const).map((value) => {
+                    const label = { none: 'Ninguno', product: 'Producto', lead: 'Lead' }[value];
+                    return <button key={value} type="button" aria-pressed={association === value} disabled={pending} onClick={() => {
+                      setAssociation(value);
+                      const nextId = value === 'product' ? task.productId || '' : value === 'lead' ? task.leadId || '' : '';
+                      setAssociationId(nextId);
+                      perform(() => patchTaskAction(projectId, task.id, { productId: value === 'product' ? nextId || null : null, leadId: value === 'lead' ? nextId || null : null }), value === 'none' ? 'Vínculo quitado.' : 'Vínculo actualizado.');
+                    }} className={cn('min-h-8 rounded-md px-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60', association === value ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>{label}</button>;
+                  })}
+                </div>
+                {association !== 'none' && <label htmlFor="task-association" className="sr-only">{association === 'product' ? 'Seleccionar producto' : 'Seleccionar lead'}</label>}
+                {association !== 'none' && <select id="task-association" value={associationId} disabled={pending} required onChange={(event) => {
+                  const nextId = event.target.value;
+                  setAssociationId(nextId);
+                  perform(() => patchTaskAction(projectId, task.id, { productId: association === 'product' ? nextId || null : null, leadId: association === 'lead' ? nextId || null : null }), 'Vínculo actualizado.');
+                }} className={field}>
+                  <option value="">Seleccionar {association === 'product' ? 'producto' : 'lead'}</option>
+                  {association === 'product' ? products.map((item) => <option key={item.id} value={item.id}>{item.name}</option>) : leads.map((item) => <option key={item.id} value={item.id}>{item.name}{item.companyName ? ` · ${item.companyName}` : ''}</option>)}
+                </select>}
+                <p className="text-xs text-slate-500">Elige un producto o un lead; nunca ambos.</p>
+              </fieldset>
+            )}
 
             <label htmlFor="task-reviewer" className="text-slate-500">Revisor</label>
             <select id="task-reviewer" defaultValue={task.reviewer?.id || ''} onChange={(event) => save(event.currentTarget, { reviewerId: event.target.value || null }, task.reviewer?.id || '')} className={field}>
@@ -326,7 +349,7 @@ export function TaskDrawer({
 
           {/* Dependencies & evidence */}
           <section aria-label="Prerequisitos y evidencias" className="space-y-2 border-t border-slate-100 pt-4">
-            <TaskDependencyEditor projectId={projectId} task={task} tasks={tasks} />
+            {projectId && <TaskDependencyEditor projectId={projectId} task={task} tasks={tasks} />}
             {task.unlocks.length > 0 && <p className="flex flex-wrap items-center gap-1 text-[11px] text-slate-500"><Link2 className="size-3" aria-hidden="true" />Desbloquea: {task.unlocks.map((item) => <Link key={item.id} href={hrefFor(item.successor.id)} scroll={false} className="font-medium text-slate-700 underline-offset-2 hover:underline">{taskCode(item.successor.number)}</Link>)}</p>}
             <div className="flex flex-wrap items-center gap-3">
               <button type="button" onClick={() => setEvidenceOpen(true)} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-card px-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50"><Camera className="size-3.5" aria-hidden="true" />Evidencias ({task.evidences?.length || 0})</button>
@@ -397,7 +420,7 @@ export function TaskDrawer({
           </div>
         </div>
 
-        <EvidenceModal projectId={projectId} taskId={task.id} taskTitle={task.title} evidences={task.evidences || []} requiresEvidence={Boolean(task.requiresEvidence)} isOpen={evidenceOpen} onClose={() => setEvidenceOpen(false)} />
+        <EvidenceModal projectId={projectId || undefined} taskId={task.id} taskTitle={task.title} evidences={task.evidences || []} requiresEvidence={Boolean(task.requiresEvidence)} isOpen={evidenceOpen} onClose={() => setEvidenceOpen(false)} />
       </SheetContent>
     </Sheet>
   );
