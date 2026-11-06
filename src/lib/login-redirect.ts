@@ -16,6 +16,13 @@ export function getLoginDestination(search: string, role?: string): string {
   } catch { return fallback; }
 }
 
+/**
+ * Login URL for a session the server rejected. `expired=1` tells the proxy not
+ * to bounce the user back to the portal just because a session cookie exists;
+ * otherwise a cookie the backend refuses causes a login <-> dashboard loop.
+ */
 export function getLoginUrl(target: string | null): string {
-  return target ? `/login?${new URLSearchParams({ next: target })}` : '/login';
+  const params = new URLSearchParams(target ? { next: target } : {});
+  params.set('expired', '1');
+  return `/login?${params}`;
 }

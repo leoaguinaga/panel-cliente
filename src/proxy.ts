@@ -28,7 +28,9 @@ export async function proxy(request: NextRequest) {
 
   // Only a real page visit to / or /login needs the role, to send the user to
   // their dashboard.
-  if (!isAuthRoute || !hasSessionCookie || request.method !== "GET") {
+  // `expired` means the server just rejected this cookie: show the login form
+  // instead of redirecting back into the portal (which caused a redirect loop).
+  if (!isAuthRoute || !hasSessionCookie || request.method !== "GET" || url.searchParams.has("expired")) {
     return NextResponse.next();
   }
 
