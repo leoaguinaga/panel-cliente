@@ -197,13 +197,17 @@ export function TaskDrawer({
             </select>
 
             {projectId ? (
-              <div className="space-y-1.5 rounded-lg border border-slate-200 bg-muted/30 p-3">
-                <p className="text-xs font-semibold text-slate-700">Vínculo: proyecto</p>
-                <p className="text-xs text-slate-500">Esta tarea pertenece al proyecto actual. Solo puede tener un vínculo.</p>
+              <>
+              <span className="self-start pt-2 text-slate-500">Vínculo</span>
+              <div className="space-y-1 rounded-lg border border-slate-200 bg-muted/30 p-3">
+                <p className="text-xs font-semibold text-slate-700">Proyecto</p>
+                <p className="text-xs text-slate-500">Esta tarea pertenece al proyecto actual.</p>
               </div>
+              </>
             ) : (
-              <fieldset className="space-y-2">
-                <legend className="text-xs font-medium text-slate-500">Vínculo</legend>
+              <>
+              <span className="self-start pt-2 text-slate-500">Vínculo</span>
+              <fieldset className="min-w-0 space-y-2">
                 <div className="grid grid-cols-3 gap-1 rounded-lg border border-slate-200 bg-muted/40 p-1" role="group" aria-label="Tipo de vínculo de la tarea">
                   {(['none', 'product', 'lead'] as const).map((value) => {
                     const label = { none: 'Ninguno', product: 'Producto', lead: 'Lead' }[value];
@@ -226,6 +230,7 @@ export function TaskDrawer({
                 </select>}
                 <p className="text-xs text-slate-500">Elige un producto o un lead; nunca ambos.</p>
               </fieldset>
+              </>
             )}
 
             <label htmlFor="task-reviewer" className="text-slate-500">Revisor</label>
