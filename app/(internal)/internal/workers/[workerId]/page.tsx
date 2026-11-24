@@ -151,13 +151,17 @@ export default async function WorkerPage({
               {worker.assignedTasks.map((task) => (
                 <Link
                   key={task.id}
-                  href={`/internal/tasks?task=${task.id}&taskProject=${task.project.id}`}
+                  href={
+                    task.project
+                      ? `/internal/tasks?task=${task.id}&taskProject=${task.project.id}`
+                      : `/internal/tasks?task=${task.id}`
+                  }
                   className={styles.workItem}
                 >
                   <div>
                     <strong>{task.title}</strong>
                     <p>
-                      FOX-{task.number} · {task.project.name}
+                      FOX-{task.number} · {task.project?.name ?? "Sin proyecto"}
                     </p>
                     <p>
                       {task.dueDate

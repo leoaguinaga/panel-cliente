@@ -32,7 +32,7 @@ function strength(value: string) {
 // Traduce las respuestas del backend (class-validator viene en inglés).
 function describe(message: string): Problem {
   if (/token/i.test(message) || /enlace|venci|expir/i.test(message))
-    return { title: 'El enlace no es válido o ya venció.', detail: 'Pide uno nuevo al equipo de FoxCode.' };
+    return { title: 'El enlace no es válido o ya venció.', detail: 'Pide uno nuevo desde «¿La olvidaste?» al iniciar sesión.' };
   if (/longer than|shorter than|password/i.test(message))
     return { title: 'La contraseña no cumple el largo.', detail: `Usa entre ${MIN} y ${MAX} caracteres.` };
   return { title: 'No se pudo guardar la contraseña.', detail: message };

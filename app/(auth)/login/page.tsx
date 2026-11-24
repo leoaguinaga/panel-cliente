@@ -1,15 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getLoginDestination } from '@/src/lib/login-redirect';
 import { authClient } from '@/src/lib/auth-client';
 import styles from '../auth.module.css';
 
-// El equipo recibe la solicitud y envía el enlace de restablecimiento por correo.
-const FORGOT_URL = `https://wa.me/51907280391?text=${encodeURIComponent(
-  'Hola, olvidé mi contraseña del portal de FoxCode.',
-)}`;
 const SITE_URL = 'https://foxcodepe.com';
 
 type LoginError = { title: string; detail: string };
@@ -107,9 +104,9 @@ export default function LoginPage() {
         <div className={styles.field}>
           <div className={styles.fieldHead}>
             <label htmlFor="password">Contraseña</label>
-            <a className={styles.forgot} href={FORGOT_URL} target="_blank" rel="noopener noreferrer">
+            <Link className={styles.forgot} href="/forgot-password">
               ¿La olvidaste?
-            </a>
+            </Link>
           </div>
           <div className={`${styles.control} ${styles.withToggle}`}>
             <input

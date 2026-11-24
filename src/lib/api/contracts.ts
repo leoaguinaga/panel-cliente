@@ -16,7 +16,7 @@ export type WorkerDetail = Worker & {
   createdAt: string;
   _count: Worker['_count'] & { assignedLeads: number };
   assignedProjects: { id: string; name: string; status: string; progress: number; client: { name: string } }[];
-  assignedTasks: { id: string; number: number; title: string; status: string; dueDate: string | null; project: { id: string; name: string } }[];
+  assignedTasks: { id: string; number: number; title: string; status: string; dueDate: string | null; project: { id: string; name: string } | null }[];
 };
 export type WorkerActivity = Activity & { entityId: string; actorId: string | null };
 export type WorkerActivityPage = { items: WorkerActivity[]; total: number; page: number; pageSize: number; actions: string[] };
